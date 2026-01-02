@@ -4,13 +4,15 @@ go 1.24.2
 
 require (
 	github.com/alecthomas/kong v1.13.0
+	github.com/go-kit/kit v0.13.0
 	github.com/goschtalt/goschtalt v0.27.0
 	github.com/goschtalt/properties-decoder v0.1.0
 	github.com/goschtalt/yaml-decoder v0.0.1
 	github.com/goschtalt/yaml-encoder v0.0.4
 	github.com/prometheus/client_golang v1.22.0
 	github.com/stretchr/testify v1.11.1
-	github.com/twmb/franz-go v1.20.5
+	github.com/twmb/franz-go v1.20.6
+	github.com/twmb/franz-go/plugin/kprom v1.3.0
 	github.com/xmidt-org/httpaux v0.4.1
 	go.uber.org/fx v1.24.0
 	gopkg.in/dealancer/validate.v2 v2.1.0
@@ -20,7 +22,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/go-kit/kit v0.13.0 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
@@ -36,7 +37,6 @@ require (
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/twmb/franz-go/pkg/kmsg v1.12.0 // indirect
-	github.com/twmb/franz-go/plugin/kprom v1.3.0 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/xmidt-org/wrp-go/v3 v3.7.0 // indirect
 	go.opentelemetry.io/otel v1.29.0 // indirect
