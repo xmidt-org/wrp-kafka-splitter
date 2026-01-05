@@ -31,70 +31,70 @@ tracing:
   skip_trace_export: true
 
 prometheus:
-    default_namespace: xmidt
-    default_subsystem: wrp_kafka_router
-    
+  default_namespace: xmidt
+  default_subsystem: wrp_kafka_router
+
 prometheus_handler:
-    instrument_metric_handler: true
-    max_requests_in_flight: 5
-    timeout: 5s
+  instrument_metric_handler: true
+  max_requests_in_flight: 5
+  timeout: 5s
 
 # Kafka Consumer Configuration
 consumer:
   # Required: List of Kafka broker addresses
   brokers:
     - "localhost:9092"
-  
+
   # Required: Topics to consume from
   topics:
     - "wrp-events"
-  
+
   # Required: Consumer group ID for offset management
   group_id: "wrp-kafka-splitter"
-  
+
   # Session timeout for consumer group membership (default: 45s)
   # session_timeout: 45s
-  
+
   # Heartbeat interval to maintain group membership (default: 3s)
   # heartbeat_interval: 3s
-  
+
   # Rebalance timeout (default: 60s)
   # rebalance_timeout: 60s
-  
+
   # Fetch configuration
   # fetch_min_bytes: 1
   # fetch_max_bytes: 52428800  # 50MB
   # fetch_max_wait: 500ms
   # fetch_max_partition_bytes: 1048576  # 1MB
   # max_concurrent_fetches: 0  # unlimited
-  
+
   # Auto-commit interval (default: 5s)
   # auto_commit_interval: 5s
-  
+
   # Disable auto-commit to manually control offsets
   # disable_auto_commit: false
-  
+
   # Start from beginning if no committed offset exists
   # consume_from_beginning: false
-  
+
   # Client identification
   # client_id: "wrp-kafka-splitter"
   # rack: ""
   # instance_id: ""
-  
+
   # Connection settings
   # conn_idle_timeout: 20s
   # request_timeout_overhead: 10s
-  
+
   # Request retries
   # request_retries: 3
-  
+
   # SASL Authentication (optional)
   # sasl:
   #   mechanism: "SCRAM-SHA-512"  # PLAIN, SCRAM-SHA-256, SCRAM-SHA-512
   #   username: "kafka-user"
   #   password: "kafka-password"
-  
+
   # TLS Encryption (optional)
   # tls:
   #   enabled: true
