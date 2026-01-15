@@ -1,0 +1,7 @@
+
+# SPDX-FileCopyrightText: 2026 Comcast Cable Communications Management, LLC
+# SPDX-License-Identifier: Apache-2.0
+---
+consumer:
+  brokers:
+    - "${KAFKA_BROKERS}"  # This will expand to the env var value

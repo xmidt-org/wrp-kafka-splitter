@@ -5,7 +5,7 @@
 
 // ^ Issue: Data race in go.uber.org/fx.exitCodeOption.apply() (at shutdown.go:44)
 // Root Cause: Multiple goroutines from server instances calling Shutdown() concurrently, with one writing to the exit code while another is reading it.
-package main
+package app
 
 import (
 	"context"
@@ -105,12 +105,12 @@ func TestWrpKafkaRouter(t *testing.T) {
 
 			if tc.panic {
 				assert.Panics(func() {
-					_, _ = wrpKafkaRouter(tc.args)
+					_, _ = WrpKafkaRouter(tc.args)
 				})
 				return
 			}
 
-			app, err := wrpKafkaRouter(tc.args)
+			app, err := WrpKafkaRouter(tc.args)
 
 			assert.ErrorIs(err, tc.expectedErr)
 			if tc.expectedErr != nil {
