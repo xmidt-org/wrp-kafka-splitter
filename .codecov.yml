@@ -10,5 +10,5 @@ coverage:
       default:
         target: 72%
 ignore:
-  - "*_test.go"
+  - "*_test.go, *_test_helper.go"
   - "vendor"
