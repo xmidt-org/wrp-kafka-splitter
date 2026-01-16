@@ -66,11 +66,12 @@ func New(opts ...Option) (*Consumer, error) {
 	}
 
 	// Build franz-go client options
-	kgoOpts := []kgo.Opt{
+	kgoOpts := make([]kgo.Opt, 0, 3+len(consumer.config.kgoOpts))
+	kgoOpts = append(kgoOpts,
 		kgo.SeedBrokers(consumer.config.brokers...),
 		kgo.ConsumerGroup(consumer.config.groupID),
 		kgo.ConsumeTopics(consumer.config.topics...),
-	}
+	)
 
 	// Append user-provided options
 	kgoOpts = append(kgoOpts, consumer.config.kgoOpts...)
