@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2026 Comcast Cable Communications Management, LLC
+# SPDX-License-Identifier: Apache-2.0
+
+# WRP Kafka Splitter Configuration
+# This is the base configuration file for the splitter service
+
+servers:
+  health:
+    http:
+      address: ":6000"
+    path: "/health"
+  
+  metrics:
+    http:
+      address: ":6001"
+    path: "/metrics"
+  
+  pprof:
+    http:
+      address: ":6002"
+    path: "/debug/pprof"
+
+consumer:
+  brokers:
+    - "kafka:9092"
+  topics:
+    - "raw-events"
+  group_id: "wrp-splitter"
+  client_id: "splitter"
+
+logger:
+  level: "INFO"
+  encoding: "json"
+  output_paths:
+    - "stdout"
+  error_output_paths:
+    - "stderr"
+
+prometheus:
+  namespace: "splitter"
+  subsystem: "kafka"
