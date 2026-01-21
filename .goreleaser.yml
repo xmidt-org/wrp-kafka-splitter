@@ -83,7 +83,7 @@ nfpms:
     id: rdk
     file_name_template: '{{ .PackageName }}_{{ .Version }}_rdk_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
     vendor: xmidt-org
-    homepage: https://github.com/xmidt-org/splitter
+    homepage: https://github.com/xmidt-org/wrp-kafka-splitter
     license: Apache-2.0
     maintainer: see_maintainers_file@example.com
     description: The client agent for the Xmidt service.
@@ -109,13 +109,13 @@ nfpms:
 
     ipk:
       fields:
-        Bugs: https://github.com/xmidt-org/splitter/issues
+        Bugs: https://github.com/xmidt-org/wrp-kafka-splitter/issues
 
   -
     id: openwrt
     file_name_template: '{{ .PackageName }}_{{ .Version }}_openwrt_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
     vendor: xmidt-org
-    homepage: https://github.com/xmidt-org/splitter
+    homepage: https://github.com/xmidt-org/wrp-kafka-splitter
     license: Apache-2.0
     maintainer: see_maintainers_file@example.com
     description: The client agent for the Xmidt service.
@@ -130,12 +130,12 @@ nfpms:
 
     ipk:
       fields:
-        Bugs: https://github.com/xmidt-org/splitter/issues
+        Bugs: https://github.com/xmidt-org/wrp-kafka-splitter/issues
   -
     id: server
     file_name_template: '{{ .PackageName }}_{{ .Version }}_debian_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
     vendor: xmidt-org
-    homepage: https://github.com/xmidt-org/splitter
+    homepage: https://github.com/xmidt-org/wrp-kafka-splitter
     license: Apache-2.0
     maintainer: see_maintainers_file@example.com
     description: The client agent for the Xmidt service.
@@ -153,7 +153,7 @@ nfpms:
       signature:
         key_file: .secrets/deb_gpg_private_key_file
       fields:
-        Bugs: https://github.com/xmidt-org/splitter/issues
+        Bugs: https://github.com/xmidt-org/wrp-kafka-splitter/issues
     rpm:
       group: System Environment/Daemons
       signature:
@@ -179,16 +179,16 @@ dockers:
     build_flag_templates:
       - "--platform=linux/amd64"
       - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.url=https://github.com/xmidt-org/splitter"
+      - "--label=org.opencontainers.image.url=https://github.com/xmidt-org/wrp-kafka-splitter"
       - "--label=org.opencontainers.image.title={{.ProjectName}}"
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.source=https://github.com/xmidt-org/splitter"
+      - "--label=org.opencontainers.image.source=https://github.com/xmidt-org/wrp-kafka-splitter"
       - "--label=org.opencontainers.image.version={{.Version}}"
     image_templates:
-      - ghcr.io/xmidt-org/splitter:{{ .Tag }}-amd64
-      - ghcr.io/xmidt-org/splitter:v{{ .Major }}-amd64
-      - ghcr.io/xmidt-org/splitter:v{{ .Major }}.{{ .Minor }}-amd64
-      - ghcr.io/xmidt-org/splitter:latest-amd64
+      - ghcr.io/xmidt-org/wrp-kafka-splitter:{{ .Tag }}-amd64
+      - ghcr.io/xmidt-org/wrp-kafka-splitter:v{{ .Major }}-amd64
+      - ghcr.io/xmidt-org/wrp-kafka-splitter:v{{ .Major }}.{{ .Minor }}-amd64
+      - ghcr.io/xmidt-org/wrp-kafka-splitter:latest-amd64
     dockerfile: 'Dockerfile'
     extra_files:
       - .release/docker
