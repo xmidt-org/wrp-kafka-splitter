@@ -33,5 +33,5 @@ go.work
 
 dist/*
 
-cmd/wrp-kafka-splitter/dist/*
+cmd/splitter/dist/*
 lint.sh

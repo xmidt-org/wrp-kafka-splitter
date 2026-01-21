@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 Comcast Cable Communications Management, LLC
 # SPDX-License-Identifier: Apache-2.0
 ---
-project_name: wrp-kafka-splitter
+project_name: splitter
 
 version: 2
 
@@ -41,7 +41,7 @@ sboms:
 
 builds:
   -
-    main:  './cmd/wrp-kafka-splitter/main.go'
+    main:  './cmd/splitter/main.go'
     env:
       - CGO_ENABLED=0
       - GO111MODULE=on
@@ -83,7 +83,7 @@ nfpms:
     id: rdk
     file_name_template: '{{ .PackageName }}_{{ .Version }}_rdk_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
     vendor: xmidt-org
-    homepage: https://github.com/xmidt-org/wrp-kafka-splitter
+    homepage: https://github.com/xmidt-org/splitter
     license: Apache-2.0
     maintainer: see_maintainers_file@example.com
     description: The client agent for the Xmidt service.
@@ -96,12 +96,12 @@ nfpms:
 
     contents:
       # systemd service file
-      - src: .release/ipk/wrp-kafka-splitter.service
-        dst: /lib/systemd/system/wrp-kafka-splitter.service
+      - src: .release/ipk/splitter.service
+        dst: /lib/systemd/system/splitter.service
 
       # base configuration file
       - src: .release/ipk/config.yml
-        dst: /etc/wrp-kafka-splitter/conf.d/01-config.yml
+        dst: /etc/splitter/conf.d/01-config.yml
 
     scripts:
       preinstall: .release/ipk/preinstall.sh
@@ -109,13 +109,13 @@ nfpms:
 
     ipk:
       fields:
-        Bugs: https://github.com/xmidt-org/wrp-kafka-splitter/issues
+        Bugs: https://github.com/xmidt-org/splitter/issues
 
   -
     id: openwrt
     file_name_template: '{{ .PackageName }}_{{ .Version }}_openwrt_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
     vendor: xmidt-org
-    homepage: https://github.com/xmidt-org/wrp-kafka-splitter
+    homepage: https://github.com/xmidt-org/splitter
     license: Apache-2.0
     maintainer: see_maintainers_file@example.com
     description: The client agent for the Xmidt service.
@@ -126,17 +126,16 @@ nfpms:
     contents:
       # base configuration file
       - src: .release/ipk/config.yml
-        dst: /etc/wrp-kafka-splitter/conf.d/01-config.yml
+        dst: /etc/splitter/conf.d/01-config.yml
 
     ipk:
       fields:
-        Bugs: https://github.com/xmidt-org/wrp-kafka-splitter/issues
-
+        Bugs: https://github.com/xmidt-org/splitter/issues
   -
     id: server
     file_name_template: '{{ .PackageName }}_{{ .Version }}_debian_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
     vendor: xmidt-org
-    homepage: https://github.com/xmidt-org/wrp-kafka-splitter
+    homepage: https://github.com/xmidt-org/splitter
     license: Apache-2.0
     maintainer: see_maintainers_file@example.com
     description: The client agent for the Xmidt service.
@@ -148,13 +147,13 @@ nfpms:
     contents:
       # base configuration file
       - src: .release/ipk/config.yml
-        dst: /etc/wrp-kafka-splitter/conf.d/01-config.yml
+        dst: /etc/splitter/conf.d/01-config.yml
 
     deb:
       signature:
         key_file: .secrets/deb_gpg_private_key_file
       fields:
-        Bugs: https://github.com/xmidt-org/wrp-kafka-splitter/issues
+        Bugs: https://github.com/xmidt-org/splitter/issues
     rpm:
       group: System Environment/Daemons
       signature:
@@ -180,16 +179,16 @@ dockers:
     build_flag_templates:
       - "--platform=linux/amd64"
       - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.url=https://github.com/xmidt-org/wrp-kafka-splitter"
+      - "--label=org.opencontainers.image.url=https://github.com/xmidt-org/splitter"
       - "--label=org.opencontainers.image.title={{.ProjectName}}"
       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.source=https://github.com/xmidt-org/wrp-kafka-splitter"
+      - "--label=org.opencontainers.image.source=https://github.com/xmidt-org/splitter"
       - "--label=org.opencontainers.image.version={{.Version}}"
     image_templates:
-      - ghcr.io/xmidt-org/wrp-kafka-splitter:{{ .Tag }}-amd64
-      - ghcr.io/xmidt-org/wrp-kafka-splitter:v{{ .Major }}-amd64
-      - ghcr.io/xmidt-org/wrp-kafka-splitter:v{{ .Major }}.{{ .Minor }}-amd64
-      - ghcr.io/xmidt-org/wrp-kafka-splitter:latest-amd64
+      - ghcr.io/xmidt-org/splitter:{{ .Tag }}-amd64
+      - ghcr.io/xmidt-org/splitter:v{{ .Major }}-amd64
+      - ghcr.io/xmidt-org/splitter:v{{ .Major }}.{{ .Minor }}-amd64
+      - ghcr.io/xmidt-org/splitter:latest-amd64
     dockerfile: 'Dockerfile'
     extra_files:
       - .release/docker

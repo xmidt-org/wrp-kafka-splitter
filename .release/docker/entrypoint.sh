@@ -18,14 +18,14 @@ _want_help() {
 }
 
 _main() {
-    # if command starts with an option, prepend wrp-kafka-splitter
+    # if command starts with an option, prepend splitter
     if [ "${1:0:1}" = '-' ]; then
-        set -- /wrp-kafka-splitter "$@"
+        set -- /splitter "$@"
     fi
 
-    # skip setup if they aren't running /wrp-kafka-splitter or want an option that stops /wrp-kafka-splitter
-    if [ "$1" = '/wrp-kafka-splitter' ] && ! _want_help "$@"; then
-        echo "Entrypoint script for wrp-kafka-splitter Client ${VERSION} started."
+    # skip setup if they aren't running /splitter or want an option that stops /wrp-kafka-splitter
+    if [ "$1" = '/splitter' ] && ! _want_help "$@"; then
+        echo "Entrypoint script for splitter Client ${VERSION} started."
     fi
 
     exec "$@"

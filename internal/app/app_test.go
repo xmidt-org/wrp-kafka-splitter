@@ -83,14 +83,14 @@ func TestWrpKafkaRouter(t *testing.T) {
 			panic:       true,
 		}, {
 			description: "enable debug mode",
-			args:        []string{"-d", "-f", "wrp-kafka-splitter.yaml"},
+			args:        []string{"-d", "-f", "splitter.yaml"},
 		}, {
 			description: "output graph",
-			args:        []string{"-g", "graph.dot", "-f", "wrp-kafka-splitter.yaml"},
+			args:        []string{"-g", "graph.dot", "-f", "splitter.yaml"},
 		}, {
 			description:      "start and stop",
 			duration:         time.Millisecond,
-			args:             []string{"-f", "wrp-kafka-splitter.yaml"},
+			args:             []string{"-f", "splitter.yaml"},
 			expectedStartErr: consumer.ErrPingingBroker,
 		},
 	}
