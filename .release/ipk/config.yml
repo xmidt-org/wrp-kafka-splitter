@@ -9,17 +9,14 @@ servers:
     http:
       address: ":6000"
     path: "/health"
-  
   metrics:
     http:
       address: ":6001"
     path: "/metrics"
-  
   pprof:
     http:
       address: ":6002"
     path: "/debug/pprof"
-
 consumer:
   brokers:
     - "kafka:9092"
@@ -27,7 +24,6 @@ consumer:
     - "raw-events"
   group_id: "wrp-splitter"
   client_id: "splitter"
-
 logger:
   level: "INFO"
   encoding: "json"
@@ -35,7 +31,6 @@ logger:
     - "stdout"
   error_output_paths:
     - "stderr"
-
 prometheus:
   namespace: "splitter"
   subsystem: "kafka"
