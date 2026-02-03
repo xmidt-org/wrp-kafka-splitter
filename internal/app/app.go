@@ -74,6 +74,13 @@ func CoreModule() fx.Option {
 		fx.Provide(
 			goschtalt.UnmarshalFunc[consumer.Config]("consumer"),
 		),
+		// Producer configuration must be unmarshaled
+		fx.Provide(
+			fx.Annotate(
+				goschtalt.UnmarshalFunc[ProducerConfig]("producer"),
+				fx.ResultTags(`name:"producer"`),
+			),
+		),
 		// Consumer is the main business logic component
 		fx.Provide(
 			provideConsumer,

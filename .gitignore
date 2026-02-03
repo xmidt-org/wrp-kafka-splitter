@@ -14,6 +14,8 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+*vendor/
+
 # VS Code directories
 *.code-workspace
 .vscode/*

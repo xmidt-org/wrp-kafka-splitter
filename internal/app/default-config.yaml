@@ -39,6 +39,16 @@ prometheus_handler:
   max_requests_in_flight: 5
   timeout: 5s
 
+producer:
+  topic_map:
+    - patterns: ["device-lifecycle"]
+      topic: "device-lifecycle"
+    - patterns: ["device-status"]
+      topics: ["device-status-0", "device-status-1", "device-status-2"]
+      shard_strategy: "deviceid"
+    - patterns: ["*"]
+      topic: "default-events"
+
 # Kafka Consumer Configuration
 consumer:
   # Required: List of Kafka broker addresses
