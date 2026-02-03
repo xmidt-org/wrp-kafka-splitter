@@ -78,7 +78,7 @@ func NewWRPMessageHandler(config WRPMessageHandlerConfig) *WRPMessageHandler {
 func (h *WRPMessageHandler) HandleMessage(ctx context.Context, record *kgo.Record) error {
 	h.messagesProcessed++
 
-	logger := h.logger.With("component", "wrp_message_handler", "source_topic")
+	logger := h.logger.With("component", "wrp_message_handler", "source_topic", record.Topic)
 
 	// Decode WRP message
 	var msg wrp.Message
