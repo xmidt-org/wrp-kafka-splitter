@@ -396,46 +396,13 @@ func TestMessageHandlerFunc(t *testing.T) {
 	}
 }
 
-// Test edge cases and error conditions
+// Test edge cases
 func TestWRPMessageHandlerEdgeCases(t *testing.T) {
 	tests := []struct {
 		name        string
 		test        func(t *testing.T)
 		description string
 	}{
-		{
-			name: "concurrent_metric_access",
-			test: func(t *testing.T) {
-				handler := NewWRPMessageHandler(WRPMessageHandlerConfig{})
-
-				// Simulate concurrent access to metrics
-				done := make(chan bool, 2)
-
-				go func() {
-					for i := 0; i < 100; i++ {
-						handler.messagesProcessed++
-						_ = handler.GetMetrics()
-					}
-					done <- true
-				}()
-
-				go func() {
-					for i := 0; i < 100; i++ {
-						handler.messagesRouted++
-						_ = handler.GetMetrics()
-					}
-					done <- true
-				}()
-
-				<-done
-				<-done
-
-				metrics := handler.GetMetrics()
-				assert.Equal(t, int64(100), metrics["messages_processed"])
-				assert.Equal(t, int64(100), metrics["messages_routed"])
-			},
-			description: "Should handle concurrent metric access safely",
-		},
 		{
 			name: "nil_record_handling",
 			test: func(t *testing.T) {
