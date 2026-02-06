@@ -40,13 +40,14 @@ prometheus_handler:
   timeout: 5s
 
 producer:
-  topic_map:
-    - patterns: ["device-lifecycle"]
+  brokers:
+    - "localhost:9092"
+  topic_routes:
+    - pattern: "device-lifecycle"
       topic: "device-lifecycle"
-    - patterns: ["device-status"]
-      topics: ["device-status-0", "device-status-1", "device-status-2"]
-      shard_strategy: "deviceid"
-    - patterns: ["*"]
+    - pattern: "device-status"
+      topic: "device-status"
+    - pattern: "*"
       topic: "default-events"
 
 # Kafka Consumer Configuration

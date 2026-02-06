@@ -10,6 +10,7 @@ import (
 
 	"xmidt-org/splitter/internal/configuration"
 	"xmidt-org/splitter/internal/consumer"
+	"xmidt-org/splitter/internal/publisher"
 
 	"github.com/goschtalt/goschtalt"
 	_ "github.com/goschtalt/goschtalt/pkg/typical"
@@ -20,7 +21,6 @@ import (
 	"github.com/xmidt-org/candlelight"
 	"github.com/xmidt-org/touchstone"
 	"github.com/xmidt-org/touchstone/touchhttp"
-	"github.com/xmidt-org/wrpkafka"
 	"gopkg.in/dealancer/validate.v2"
 )
 
@@ -34,50 +34,8 @@ type Config struct {
 	Prometheus        touchstone.Config
 	PrometheusHandler touchhttp.Config
 	Servers           Servers
-	Producer          ProducerConfig
+	Producer          publisher.Config
 	Consumer          consumer.Config
-}
-
-// ProducerConfig defines the configuration for the WRP Kafka producer
-type ProducerConfig struct {
-	TopicMap []TopicRouteConfig
-}
-
-// TopicRouteConfig defines a single topic routing rule
-type TopicRouteConfig struct {
-	Patterns      []string `yaml:"patterns"`
-	Topic         string   `yaml:"topic,omitempty"`
-	Topics        []string `yaml:"topics,omitempty"`
-	ShardStrategy string   `yaml:"shard_strategy,omitempty"`
-}
-
-// ToWRPKafkaRoutes converts ProducerConfig to wrpkafka.TopicRoute slice
-func (pc ProducerConfig) ToWRPKafkaRoutes() []wrpkafka.TopicRoute {
-	var routes []wrpkafka.TopicRoute
-
-	for _, routeConfig := range pc.TopicMap {
-		// Create a separate route for each pattern
-		for _, pattern := range routeConfig.Patterns {
-			route := wrpkafka.TopicRoute{
-				Pattern: wrpkafka.Pattern(pattern),
-			}
-
-			if routeConfig.Topic != "" {
-				route.Topic = routeConfig.Topic
-			}
-
-			if len(routeConfig.Topics) > 0 {
-				route.Topics = routeConfig.Topics
-			}
-
-			if routeConfig.ShardStrategy != "" {
-				route.TopicShardStrategy = wrpkafka.TopicShardStrategy(routeConfig.ShardStrategy)
-			}
-
-			routes = append(routes, route)
-		}
-	}
-	return routes
 }
 
 type Servers struct {

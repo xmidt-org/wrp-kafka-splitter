@@ -10,6 +10,7 @@ import (
 	"xmidt-org/splitter/internal/log"
 	"xmidt-org/splitter/internal/metrics"
 	"xmidt-org/splitter/internal/observe"
+	"xmidt-org/splitter/internal/publisher"
 
 	"go.uber.org/fx"
 )
@@ -18,7 +19,7 @@ import (
 type ConsumerIn struct {
 	fx.In
 	Config        consumer.Config
-	ProducerCfg   ProducerConfig `name:"producer"`
+	Publisher     *publisher.Publisher
 	LogEmitter    *observe.Subject[log.Event]
 	MetricEmitter *observe.Subject[metrics.Event]
 }
@@ -33,13 +34,12 @@ type ConsumerOut struct {
 func provideConsumer(in ConsumerIn) (ConsumerOut, error) {
 	cfg := in.Config
 
-	// Convert producer config to wrpkafka routes
-	wrpRoutes := in.ProducerCfg.ToWRPKafkaRoutes()
-
-	wrpHandler, err := consumer.CreateWRPMessageHandler(cfg.Brokers, wrpRoutes, nil)
-	if err != nil {
-		return ConsumerOut{}, fmt.Errorf("failed to create WRP message handler: %w", err)
-	}
+	// Create the WRP message handler with the provided publisher
+	handler := consumer.NewWRPMessageHandler(consumer.WRPMessageHandlerConfig{
+		Producer:       in.Publisher,
+		LogEmitter:     in.LogEmitter,
+		MetricsEmitter: in.MetricEmitter,
+	})
 
 	// Build options from configuration - validation is handled by the option functions
 	opts := []consumer.Option{
@@ -53,7 +53,7 @@ func provideConsumer(in ConsumerIn) (ConsumerOut, error) {
 		consumer.WithGroupID(cfg.GroupID),
 
 		// Message handler
-		consumer.WithMessageHandler(wrpHandler),
+		consumer.WithMessageHandler(consumer.MessageHandlerFunc(handler.HandleMessage)),
 
 		// Client identification
 		consumer.WithClientID(cfg.ClientID),
