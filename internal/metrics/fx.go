@@ -32,6 +32,7 @@ type metricDefinition struct {
 // metrics
 const (
 	ConsumerErrors = "consumer_errors"
+	ConsumerPauses = "consumer_pauses"
 )
 
 // labels
@@ -47,6 +48,12 @@ var fxMetrics = []metricDefinition{
 		Name:   ConsumerErrors,
 		Help:   "Total number of consumer errors of a given type",
 		Labels: fmt.Sprintf("%s,%s,%s", PartitionLabel, TopicLabel, ErrorTypeLabel),
+	},
+	{
+		Type:   COUNTER,
+		Name:   ConsumerPauses,
+		Help:   "Total number of consumer pauses",
+		Labels: "",
 	},
 }
 

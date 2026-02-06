@@ -13,10 +13,10 @@ import (
 	"xmidt-org/splitter/internal/observe"
 
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/xmidt-org/wrpkafka"
 	"go.uber.org/fx"
 )
 
-// splitter  module as a potential library component - rework this.
 type ConsumerIn struct {
 	fx.In
 	Config        consumer.Config
@@ -47,11 +47,11 @@ func provideConsumer(in ConsumerIn) (ConsumerOut, error) {
 
 		// Message handler (placeholder - replace with actual implementation)
 		consumer.WithMessageHandler(
-			consumer.MessageHandlerFunc(func(ctx context.Context, record *kgo.Record) error {
+			consumer.MessageHandlerFunc(func(ctx context.Context, record *kgo.Record) (wrpkafka.Outcome, error) {
 				// TODO: Replace with actual WRP message processing
 				fmt.Printf("Received message: topic=%s partition=%d offset=%d key=%s value=%s\n",
 					record.Topic, record.Partition, record.Offset, string(record.Key), string(record.Value))
-				return nil
+				return wrpkafka.Attempted, nil
 			}),
 		),
 
@@ -86,7 +86,6 @@ func provideConsumer(in ConsumerIn) (ConsumerOut, error) {
 		// Connection (Duration type, not pointer)
 		consumer.WithConnIdleTimeout(cfg.ConnIdleTimeout),
 		consumer.WithRequestTimeoutOverhead(cfg.RequestTimeoutOverhead),
-		consumer.WithDisableAutoCommit(cfg.DisableAutoCommit),
 		consumer.WithConsumeFromTheBeginning(cfg.ConsumeFromBeginning),
 	}
 

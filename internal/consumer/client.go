@@ -23,6 +23,18 @@ type Client interface {
 
 	// Close closes the client and cleans up resources.
 	Close()
+
+	// ResumeFetchTopics resumes fetching for the configured topics.
+	ResumeFetchTopics(topics ...string)
+
+	// PauseFetchTopics pauses fetching for the configured topics.
+	PauseFetchTopics(topics ...string) []string
+
+	// MarkCommitRecords marks the provided records for offset commit.
+	MarkCommitRecords(records ...*kgo.Record)
+
+	// CommitMarkedOffsets commits the offsets that have been marked.
+	CommitMarkedOffsets(ctx context.Context) error
 }
 
 // Ensure kgo.Client implements our Client interface at compile time.

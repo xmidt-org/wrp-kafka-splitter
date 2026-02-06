@@ -8,15 +8,21 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"xmidt-org/splitter/internal/log"
 	"xmidt-org/splitter/internal/metrics"
 	"xmidt-org/splitter/internal/observe"
 
+	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/xmidt-org/wrpkafka"
 )
 
 var ErrPingingBroker = errors.New("error pinging kafka broker")
+
+var tickerInterval = 5 * time.Second
 
 // Consumer represents a high-throughput Kafka consumer using franz-go.
 // It manages the consumer lifecycle, message polling, and graceful shutdown.
@@ -31,8 +37,14 @@ type Consumer struct {
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 
-	mu      sync.RWMutex
-	running bool
+	mu                        sync.RWMutex
+	running                   bool
+	timeSinceLastSuccess      atomic.Int64
+	pauseThresholdSeconds     int64
+	resumeDelaySeconds        int64
+	pauseResumeTickerInterval time.Duration
+	isPaused                  atomic.Bool
+	unPauseAt                 atomic.Int64
 }
 
 // New creates a new Consumer with the provided options.
@@ -44,7 +56,7 @@ func New(opts ...Option) (*Consumer, error) {
 
 	consumer := &Consumer{
 		config: &consumerConfig{
-			kgoOpts: make([]kgo.Opt, 0),
+			kgoOpts: make([]kgo.Opt, 0), // TODO - this does nothing?
 		},
 		logEmitter: log.NewNoop(), // Default to no-op emitter
 		ctx:        ctx,
@@ -71,6 +83,7 @@ func New(opts ...Option) (*Consumer, error) {
 		kgo.SeedBrokers(consumer.config.brokers...),
 		kgo.ConsumerGroup(consumer.config.groupID),
 		kgo.ConsumeTopics(consumer.config.topics...),
+		kgo.AutoCommitMarks(), // commit marked offsets automatically
 	)
 
 	// Append user-provided options
@@ -78,6 +91,8 @@ func New(opts ...Option) (*Consumer, error) {
 
 	// Create franz-go client
 	client, err := kgo.NewClient(kgoOpts...)
+
+	//client.MarkCommitRecords() // add to interface
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to create kafka client: %w", err)
@@ -107,15 +122,20 @@ func (c *Consumer) Start() error {
 		return fmt.Errorf("failed to ping kafka brokers: %s, %w", err.Error(), ErrPingingBroker)
 	}
 
-	c.running = true
-	c.wg.Add(1)
-
 	c.emitLog(log.LevelInfo, "consumer started", map[string]any{
 		"topics":   c.config.topics,
 		"group_id": c.config.groupID,
 	})
 
+	c.timeSinceLastSuccess.Store(time.Now().Unix())
+
+	// Start polling loop in background
+	c.running = true
+
+	c.wg.Add(1)
 	go c.pollLoop()
+	c.wg.Add(1)
+	go c.startManageFetchState()
 
 	return nil
 }
@@ -200,7 +220,7 @@ func (c *Consumer) pollLoop() {
 					"partition": err.Partition,
 				})
 				c.metricEmitter.Notify(metrics.Event{
-					Name: "consumer_errors",
+					Name: metrics.ConsumerErrors,
 					Labels: []string{
 						"partition", fmt.Sprintf("%d", err.Partition),
 						"topic", err.Topic,
@@ -213,7 +233,14 @@ func (c *Consumer) pollLoop() {
 
 		// Process each record
 		fetches.EachRecord(func(record *kgo.Record) {
-			if err := c.handleRecord(record); err != nil {
+			if c.isPaused.Load() {
+				// Stop processing remaining records in this batch
+				return
+			}
+
+			var err error
+			var outcome wrpkafka.Outcome
+			if outcome, err = c.handleRecord(record); err != nil {
 				c.emitLog(log.LevelError, "message handling error", map[string]any{
 					"error":     err,
 					"topic":     record.Topic,
@@ -221,53 +248,168 @@ func (c *Consumer) pollLoop() {
 					"offset":    record.Offset,
 				})
 				c.metricEmitter.Notify(metrics.Event{
-					Name: "consumer_errors",
-					Labels: []string{
-						"partition", fmt.Sprintf("%d", record.Partition),
-						"topic", record.Topic,
-						"type", "record",
-					},
-					Value: 1,
-				})
-			}
-		})
-
-		// the only time autocommit really comes into play is if the consuming application
-		// itself crashes.  Producer errors returned above are either non-retryable kafka errors or
-		// bad wrp messages errors.  Likewise, Fetch errors are logged but do not prevent commits.
-		if c.config.autocommitDisabled {
-			if err := c.client.CommitUncommittedOffsets(context.Background()); err != nil {
-				c.emitLog(log.LevelError, "commit failed", map[string]any{
-					"error": err,
-				})
-				c.metricEmitter.Notify(metrics.Event{
 					Name: metrics.ConsumerErrors,
 					Labels: []string{
-						metrics.PartitionLabel, "unknown",
-						metrics.TopicLabel, "unknown",
-						metrics.ErrorTypeLabel, "commit",
+						metrics.PartitionLabel, fmt.Sprintf("%d", record.Partition),
+						metrics.TopicLabel, record.Topic,
+						metrics.ErrorTypeLabel, "record",
 					},
 					Value: 1,
 				})
 			}
-		}
-
+			c.handleOutcome(outcome, err, record)
+		})
 	}
 }
 
+// Commit Logic:
+//
+// 1. if outcome is Attempted, Queued or Accepted, the record is marked for commit.
+// 2. if the outcome is Failed and the error is not retryable, the record is marked for commit.
+// 3. if the outcome is Failed and the error is retryable, the record is NOT marked for commit.
+//
+// Notes and Shortcomings On Commit Logic:
+//
+// 1. number 3 does not do much of anything, since any subsequent records
+// that are successfully Queued or Attempted will commit all previous records anyway.
+// The partitions we are reading from contain a mix of QOS levels, so while the records may
+// be treated differently in the producer, they all share the same offsets
+// in the consumer. If we really want to avoid losing QOS > 74, we would probably need
+// to create a retry queue just for those records.
+//
+// 2. If we don't want to mark ANY records for commit because the producer is
+// failing due to loss of network connectivity and full buffers, we would need to modify
+// wrpkafka library to return synchronous errors for queued and attempted outcomes.
+// However, the current assumption is that these errors are not returned
+// because we are not interested in reprocessing records with QOS < 74.
+//
+// 3. as a side note, the callbacks also cannot be used to control offset commits,
+// because there is no good way to tie the producer record to the consumer record.
+//
+// 4. We could potentially use transactions but wrpkafka does not currently support them and
+// we would probably want to batch the same QOS together which gets more complicated.
+//
+// 5. One viable improvement could be to pause fetches if we see a lot of retryable errors
+// in the callbacks. (i.e. network issues or full buffers).
+func (c *Consumer) handleOutcome(outcome wrpkafka.Outcome, err error, record *kgo.Record) {
+	// if queued, attempted or accepted, mark for commit
+	if outcome != wrpkafka.Failed {
+		c.client.MarkCommitRecords(record)
+	} else if err != nil && !isRetryable(err) {
+		// if ProduceSync failed but is not retryable, mark for commit
+		c.client.MarkCommitRecords(record)
+	} else {
+		// do not mark failures with retryable errors for commit, but see notes above that this does not do much
+		// TODO - potentially commit and implement a local retry queue for high QOS
+	}
+
+	if outcome == wrpkafka.Accepted {
+		c.timeSinceLastSuccess.Store(time.Now().Unix())
+	}
+}
+
+func isRetryable(err error) bool {
+	return errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, kerr.RequestTimedOut) || errors.Is(err, kgo.ErrMaxBuffered)
+}
+
+func (c *Consumer) startManageFetchState() {
+	defer c.wg.Done() // Decrement when this goroutine exits
+
+	ticker := time.NewTicker(tickerInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-c.ctx.Done():
+			// The context was cancelled, time to exit the goroutine.
+			c.emitLog(log.LevelInfo, "Context cancelled, stopping manageFetchState loop.", map[string]any{})
+			return
+		case <-ticker.C:
+			c.manageFetchState()
+		}
+	}
+}
+
+func (c *Consumer) manageFetchState() {
+	// No defer c.wg.Done() here - this is called by the ticker, not as a goroutine
+
+	now := time.Now().Unix()
+	lastSuccess := c.timeSinceLastSuccess.Load()
+	elapsed := now - lastSuccess
+
+	if c.isPaused.Load() {
+		// Resume if: 1) timer expired OR 2) recent success
+		shouldResume := time.Now().After(time.Unix(c.unPauseAt.Load(), 0)) ||
+			elapsed < c.pauseThresholdSeconds
+
+		if shouldResume {
+			c.resumeFetchTopics()
+		}
+		return
+	}
+
+	// Not paused - check if we should pause
+	if elapsed >= c.pauseThresholdSeconds {
+		c.pauseFetchTopics()
+	}
+}
+
+func (c *Consumer) pauseFetchTopics() {
+	if c.isPaused.Load() {
+		return
+	}
+	c.emitLog(log.LevelWarn, "pausing fetches due to sustained publish failures", map[string]any{})
+	c.client.PauseFetchTopics(c.config.topics...)
+	c.isPaused.Store(true)
+	c.unPauseAt.Store(time.Now().Add(time.Duration(c.resumeDelaySeconds) * time.Second).Unix())
+}
+
+func (c *Consumer) resumeFetchTopics() {
+	c.emitLog(log.LevelInfo, "resuming fetches after pause", map[string]any{})
+	c.client.ResumeFetchTopics(c.config.topics...)
+	c.isPaused.Store(false)
+}
+
 // handleRecord processes a single record using the configured handler.
-func (c *Consumer) handleRecord(record *kgo.Record) error {
+// not that if the buffer is full, franz-go will block on produce until the delivery timeout,
+// , so this call should be synchonous and also block to avoid consuming more messages
+func (c *Consumer) handleRecord(record *kgo.Record) (wrpkafka.Outcome, error) {
 	// Create a context for this message
 	// In a real implementation, this would include tracing context
 	ctx := context.Background()
 
 	// Invoke the handler
-	if err := c.handler.HandleMessage(ctx, record); err != nil {
-		return fmt.Errorf("handler error for topic=%s partition=%d offset=%d: %w",
-			record.Topic, record.Partition, record.Offset, err)
+	return c.handler.HandleMessage(ctx, record)
+}
+
+func (c *Consumer) HandlePublishEvent(event *wrpkafka.PublishEvent) {
+
+	// TODO - metrics (see talaria for how metrics are handled)
+	// c.metricEmitter.Notify(metrics.Event{
+	// 	Name:   metrics.ProducerPublish,
+	// 	Labels: labels,
+	// 	Value:  1,
+	// })
+
+	// log emission
+	if event.Error != nil {
+		c.emitLog(log.LevelError, "message publish error", map[string]any{
+			"topic":     event.Topic,
+			"error":     event.Error,
+			"errorType": event.ErrorType,
+		})
+	} else {
+		c.emitLog(log.LevelDebug, "message published successfully", map[string]any{
+			"topic": event.Topic,
+			"qos":   event.EventType,
+		})
 	}
 
-	return nil
+	// update last success time
+	if event.Error == nil {
+		c.timeSinceLastSuccess.Store(time.Now().Unix())
+	}
 }
 
 // emitEvent emits a log event to the configured emitter.

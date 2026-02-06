@@ -19,7 +19,7 @@ func TestSubjectTestSuite(t *testing.T) {
 
 // TestNew tests creating a new metrics subject with observers
 func (s *SubjectTestSuite) TestNew() {
-	counter := &mockCounter{}
+	counter := &MockCounter{}
 	metrics := Metrics{
 		ConsumerErrors: counter,
 	}
@@ -31,7 +31,11 @@ func (s *SubjectTestSuite) TestNew() {
 
 // TestNew_NotifyObservers tests that observers are notified when events are published
 func (s *SubjectTestSuite) TestNew_NotifyObservers() {
-	counter := &mockCounter{}
+	counter := &MockCounter{}
+	expectedLabels := []string{PartitionLabel, "0", TopicLabel, "test-topic", ErrorTypeLabel, "decode_error"}
+	counter.On("With", expectedLabels).Return(counter)
+	counter.On("Add", 1.0).Return()
+
 	metrics := Metrics{
 		ConsumerErrors: counter,
 	}
@@ -41,20 +45,23 @@ func (s *SubjectTestSuite) TestNew_NotifyObservers() {
 	// Publish an event
 	event := Event{
 		Name:   ConsumerErrors,
-		Labels: []string{PartitionLabel, "0", TopicLabel, "test-topic", ErrorTypeLabel, "decode_error"},
+		Labels: expectedLabels,
 		Value:  1.0,
 	}
 
 	subject.NotifySync(event)
 
 	// Verify the counter was called
-	s.True(counter.addCalled)
-	s.Equal(1.0, counter.addValue)
+	counter.AssertExpectations(s.T())
 }
 
 // TestNew_MultipleEvents tests publishing multiple events
 func (s *SubjectTestSuite) TestNew_MultipleEvents() {
-	counter := &mockCounter{}
+	counter := &MockCounter{}
+	expectedLabels := []string{ErrorTypeLabel, "test_error"}
+	counter.On("With", expectedLabels).Return(counter).Times(5)
+	counter.On("Add", 1.0).Return().Times(5)
+
 	metrics := Metrics{
 		ConsumerErrors: counter,
 	}
@@ -65,20 +72,21 @@ func (s *SubjectTestSuite) TestNew_MultipleEvents() {
 	for i := 0; i < 5; i++ {
 		event := Event{
 			Name:   ConsumerErrors,
-			Labels: []string{ErrorTypeLabel, "test_error"},
+			Labels: expectedLabels,
 			Value:  1.0,
 		}
 		subject.NotifySync(event)
 	}
 
-	// Verify the counter was called (accumulated value)
-	s.True(counter.addCalled)
-	s.Equal(5.0, counter.addValue)
+	// Verify the counter was called 5 times
+	counter.AssertExpectations(s.T())
 }
 
 // TestNew_EventWithDifferentName tests that events with non-matching names are ignored
 func (s *SubjectTestSuite) TestNew_EventWithDifferentName() {
-	counter := &mockCounter{}
+	counter := &MockCounter{}
+	// No expectations set - methods should not be called
+
 	metrics := Metrics{
 		ConsumerErrors: counter,
 	}
@@ -95,7 +103,8 @@ func (s *SubjectTestSuite) TestNew_EventWithDifferentName() {
 	subject.Notify(event)
 
 	// Counter should not be called because name doesn't match
-	s.False(counter.addCalled)
+	counter.AssertNotCalled(s.T(), "With")
+	counter.AssertNotCalled(s.T(), "Add")
 }
 
 // TestNewNoop tests creating a no-op metrics subject
@@ -134,7 +143,7 @@ func (s *SubjectTestSuite) TestNewNoop_MultipleEvents() {
 
 // TestCreateObservers tests the createObservers function
 func (s *SubjectTestSuite) TestCreateObservers() {
-	counter := &mockCounter{}
+	counter := &MockCounter{}
 	metrics := Metrics{
 		ConsumerErrors: counter,
 	}
@@ -152,7 +161,7 @@ func (s *SubjectTestSuite) TestCreateObservers() {
 
 // TestMetrics_Struct tests the Metrics struct
 func (s *SubjectTestSuite) TestMetrics_Struct() {
-	counter := &mockCounter{}
+	counter := &MockCounter{}
 	metrics := Metrics{
 		ConsumerErrors: counter,
 	}
@@ -173,21 +182,21 @@ func (s *SubjectTestSuite) TestMetric_Struct() {
 		{
 			name: "counter only",
 			metric: Metric{
-				counter: &mockCounter{},
+				counter: &MockCounter{},
 			},
 			hasCounter: true,
 		},
 		{
 			name: "gauge only",
 			metric: Metric{
-				gauge: &mockGauge{},
+				gauge: &MockGauge{},
 			},
 			hasGauge: true,
 		},
 		{
 			name: "histogram only",
 			metric: Metric{
-				histogram: &mockHistogram{},
+				histogram: &MockHistogram{},
 			},
 			hasHistogram: true,
 		},

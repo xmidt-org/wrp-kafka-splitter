@@ -11,6 +11,7 @@ import (
 
 type Metrics struct {
 	ConsumerErrors kit.Counter
+	ConsumerPauses kit.Counter
 }
 
 type Metric struct {

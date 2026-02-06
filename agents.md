@@ -81,7 +81,7 @@ This document provides guidelines for AI agents working with this Go repository.
 
 ## Testing
 
-### Test Organization
+### Test Structure
 - Place tests in the same package as the code (use `_test.go` suffix)
 - Use one test file per source `_.go` file.  Do not split tests into multiple files for a single source file.
 - Use test suites (use library "testify/suite") to set up tests and break them down. 
@@ -89,6 +89,8 @@ This document provides guidelines for AI agents working with this Go repository.
 - Name test functions `TestXxx` where Xxx describes what's being tested
 - Use table-driven tests for testing multiple scenarios
 - Use subtests (`t.Run()`) to organize related test cases
+- for mocks, use the mock package from "github.com/stretchr/testify".  Mocks should go 
+  in the same directory as the tests in a file called "mocks_test.go". 
 
 ### Test Quality
 - Aim for high test coverage (80%+ for critical paths)

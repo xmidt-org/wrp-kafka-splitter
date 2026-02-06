@@ -32,7 +32,7 @@ tracing:
 
 prometheus:
   default_namespace: xmidt
-  default_subsystem: wrp_kafka_router
+  default_subsystem: wrp_kafka_splitter
 
 prometheus_handler:
   instrument_metric_handler: true
@@ -102,3 +102,28 @@ consumer:
   #   cert_file: "/path/to/client-cert.pem"
   #   key_file: "/path/to/client-key.pem"
   #   insecure_skip_verify: false
+
+# Logger Configuration
+logger:
+  # Log level (DEBUG, INFO, WARN, ERROR)
+  level: "DEBUG"
+
+  # Log encoding format (json, console)
+  encoding: "json"
+
+  # Output destinations for logs
+  output_paths:
+    - "stdout"
+
+  # Output destinations for error logs
+  error_output_paths:
+    - "stderr"
+
+  # Development mode (more verbose output, colored logs)
+  development: false
+
+  # Level encoding (lowercase, capital, capitalColor)
+  encode_level: "lowercase"
+
+  # Time encoding (iso8601, millis, nanos, rfc3339)
+  encode_time: "iso8601"
