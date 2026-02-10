@@ -157,14 +157,6 @@ func (p *Publisher) Produce(ctx context.Context, msg *wrp.Message) (wrpkafka.Out
 
 	outcome, err := p.wrpPublisher.Produce(ctx, msg)
 	if err != nil {
-		p.metricEmitter.Notify(metrics.Event{
-			Name:  "publisher_errors",
-			Value: 1,
-			Labels: []string{
-				"error_type", "produce_failure",
-				"message_type", msg.Type.String(),
-			},
-		})
 		p.logEmitter.Notify(log.NewEvent(log.LevelError, "Failed to produce WRP message", map[string]any{
 			"error":        err.Error(),
 			"message_type": msg.Type.String(),
@@ -175,7 +167,7 @@ func (p *Publisher) Produce(ctx context.Context, msg *wrp.Message) (wrpkafka.Out
 	}
 
 	p.metricEmitter.Notify(metrics.Event{
-		Name:  "messages_produced_success",
+		Name:  "messages_produced",
 		Value: 1,
 		Labels: []string{
 			"message_type", msg.Type.String(),

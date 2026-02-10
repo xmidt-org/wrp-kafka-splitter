@@ -107,10 +107,10 @@ func (h *WRPMessageHandler) HandleMessage(ctx context.Context, record *kgo.Recor
 		h.emitLog(log.LevelError, "failed to produce WRP message", map[string]any{
 			"error": err.Error(),
 		})
-		return fmt.Errorf("production failed: %w", err)
+		return fmt.Errorf("produce failed: %w", err)
 	}
 
-	h.emitLog(log.LevelInfo, "successfully routed WRP message", map[string]any{
+	h.emitLog(log.LevelDebug, "successfully routed WRP message", map[string]any{
 		"outcome": outcome.String(),
 	})
 
