@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 
 	"xmidt-org/splitter/internal/log"
@@ -46,15 +47,21 @@ type WRPMessageHandlerTestSuite struct {
 	mockPublisher *MockWRPProducer
 	logEmitter    *observe.Subject[log.Event]
 	logEvents     []log.Event
+	logMutex      sync.Mutex // Protects logEvents slice
 }
 
 func (suite *WRPMessageHandlerTestSuite) SetupTest() {
 	suite.mockPublisher = new(MockWRPProducer)
+	suite.logMutex.Lock()
 	suite.logEvents = make([]log.Event, 0)
+	suite.logMutex.Unlock()
+
 	suite.logEmitter = observe.NewSubject[log.Event]()
 
-	// Add observer to capture log events
+	// Add observer to capture log events with proper synchronization
 	suite.logEmitter.Attach(func(event log.Event) {
+		suite.logMutex.Lock()
+		defer suite.logMutex.Unlock()
 		suite.logEvents = append(suite.logEvents, event)
 	})
 
@@ -63,6 +70,28 @@ func (suite *WRPMessageHandlerTestSuite) SetupTest() {
 		producer:   nil, // Will be mocked through the WRPProducer interface
 		logEmitter: suite.logEmitter,
 	}
+}
+
+// Helper methods for thread-safe access to logEvents
+func (suite *WRPMessageHandlerTestSuite) getLogEvents() []log.Event {
+	suite.logMutex.Lock()
+	defer suite.logMutex.Unlock()
+	// Return a copy to avoid race conditions
+	events := make([]log.Event, len(suite.logEvents))
+	copy(events, suite.logEvents)
+	return events
+}
+
+func (suite *WRPMessageHandlerTestSuite) clearLogEvents() {
+	suite.logMutex.Lock()
+	defer suite.logMutex.Unlock()
+	suite.logEvents = suite.logEvents[:0]
+}
+
+func (suite *WRPMessageHandlerTestSuite) getLogEventCount() int {
+	suite.logMutex.Lock()
+	defer suite.logMutex.Unlock()
+	return len(suite.logEvents)
 }
 
 // Helper function to create MessagePack encoded WRP messages
@@ -263,8 +292,8 @@ func (suite *WRPMessageHandlerTestSuite) TestHandleMessage() {
 			// Verify mock expectations
 			mockProducer.AssertExpectations(suite.T())
 
-			// Clear log events for next test
-			suite.logEvents = suite.logEvents[:0]
+			// Clear log events for next test with proper synchronization
+			suite.clearLogEvents()
 		})
 	}
 }
@@ -291,7 +320,8 @@ func (h *testWRPMessageHandler) HandleMessage(ctx context.Context, record *kgo.R
 		attrs["error"] = err.Error()
 		attrs["record_size"] = len(record.Value)
 
-		h.emitLog(log.LevelWarn, "failed to decode WRP message", attrs)
+		// Use NotifySync for predictable test behavior
+		h.logEmitter.NotifySync(log.NewEvent(log.LevelWarn, "failed to decode WRP message", attrs))
 		return nil
 	}
 
@@ -305,7 +335,8 @@ func (h *testWRPMessageHandler) HandleMessage(ctx context.Context, record *kgo.R
 	msgAttrs["destination"] = msg.Destination
 	msgAttrs["transaction_uuid"] = msg.TransactionUUID
 
-	h.emitLog(log.LevelDebug, "processing WRP message", msgAttrs)
+	// Use NotifySync for predictable test behavior
+	h.logEmitter.NotifySync(log.NewEvent(log.LevelDebug, "processing WRP message", msgAttrs))
 
 	// Use mock producer instead of real one
 	outcome, err := h.mockProducer.Produce(ctx, &msg)
@@ -316,7 +347,8 @@ func (h *testWRPMessageHandler) HandleMessage(ctx context.Context, record *kgo.R
 		}
 		errorAttrs["error"] = err.Error()
 
-		h.emitLog(log.LevelError, "failed to produce WRP message", errorAttrs)
+		// Use NotifySync for predictable test behavior
+		h.logEmitter.NotifySync(log.NewEvent(log.LevelError, "failed to produce WRP message", errorAttrs))
 		return fmt.Errorf("production failed: %w", err)
 	}
 
@@ -326,7 +358,8 @@ func (h *testWRPMessageHandler) HandleMessage(ctx context.Context, record *kgo.R
 	}
 	successAttrs["outcome"] = outcome.String()
 
-	h.emitLog(log.LevelInfo, "successfully routed WRP message", successAttrs)
+	// Use NotifySync for predictable test behavior
+	h.logEmitter.NotifySync(log.NewEvent(log.LevelInfo, "successfully routed WRP message", successAttrs))
 
 	return nil
 }
