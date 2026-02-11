@@ -22,6 +22,7 @@ jobs:
   ci:
     uses: xmidt-org/shared-go/.github/workflows/ci.yml@3e639071afa98e4c89f393266a1c26d2e12eb04c # v4.9.12
     with:
+      release-project-name: splitter
       release-type:         program
       release-main-package: ./cmd/splitter
       release-custom-file:  true
