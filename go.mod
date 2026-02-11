@@ -3,7 +3,7 @@ module xmidt-org/splitter
 go 1.25.2
 
 require (
-	github.com/alecthomas/kong v1.13.0
+	github.com/alecthomas/kong v1.14.0
 	github.com/go-kit/kit v0.13.0
 	github.com/goschtalt/goschtalt v0.27.0
 	github.com/goschtalt/properties-decoder v0.1.0
