@@ -3,7 +3,7 @@ module xmidt-org/splitter
 go 1.25.2
 
 require (
-	github.com/alecthomas/kong v1.13.0
+	github.com/alecthomas/kong v1.14.0
 	github.com/go-kit/kit v0.13.0
 	github.com/goschtalt/goschtalt v0.27.0
 	github.com/goschtalt/properties-decoder v0.1.0
@@ -14,6 +14,7 @@ require (
 	github.com/testcontainers/testcontainers-go v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/kafka v0.40.0
 	github.com/twmb/franz-go v1.20.6
+	github.com/twmb/franz-go/pkg/kmsg v1.12.0
 	github.com/twmb/franz-go/plugin/kprom v1.3.0
 	github.com/xmidt-org/httpaux v0.4.2
 	github.com/xmidt-org/wrp-go/v3 v3.7.0
@@ -73,7 +74,6 @@ require (
 	github.com/tinylib/msgp v1.5.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
-	github.com/twmb/franz-go/pkg/kmsg v1.12.0 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/xmidt-org/eventor v1.0.23 // indirect
 	github.com/xmidt-org/wrp-go/v5 v5.4.0 // indirect
