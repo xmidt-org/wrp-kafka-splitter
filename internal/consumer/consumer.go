@@ -41,14 +41,13 @@ type Consumer struct {
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 
-	mu                        sync.RWMutex
-	running                   bool
-	timeSinceLastSuccess      atomic.Int64
-	pauseThresholdSeconds     int64
-	resumeDelaySeconds        int64
-	pauseResumeTickerInterval time.Duration
-	isPaused                  atomic.Bool
-	unPauseAt                 atomic.Int64
+	mu                    sync.RWMutex
+	running               bool
+	timeSinceLastSuccess  atomic.Int64
+	pauseThresholdSeconds int64
+	resumeDelaySeconds    int64
+	isPaused              atomic.Bool
+	unPauseAt             atomic.Int64
 }
 
 // New creates a new Consumer with the provided options.
@@ -304,10 +303,9 @@ func (c *Consumer) handleOutcome(outcome wrpkafka.Outcome, err error, record *kg
 	} else if err != nil && !isRetryable(err) {
 		// if ProduceSync failed but is not retryable, mark for commit
 		c.client.MarkCommitRecords(record)
-	} else {
-		// do not mark failures with retryable errors for commit, but see notes above that this does not do much
-		// TODO - potentially commit and implement a local retry queue for high QOS
 	}
+	// do not mark failures with retryable errors for commit, but see notes above that this does not do much
+	// TODO - potentially implement a local retry queue for high QOS
 
 	if outcome == wrpkafka.Accepted {
 		c.timeSinceLastSuccess.Store(time.Now().Unix())
@@ -331,8 +329,8 @@ func (c *Consumer) startManageFetchState() {
 	for {
 		select {
 		case <-c.ctx.Done():
-			// The context was cancelled, time to exit the goroutine.
-			c.emitLog(log.LevelInfo, "Context cancelled, stopping manageFetchState loop.", map[string]any{})
+			// The context was canceled, time to exit the goroutine.
+			c.emitLog(log.LevelInfo, "Context canceled, stopping manageFetchState loop.", map[string]any{})
 			return
 		case <-ticker.C:
 			c.manageFetchState()

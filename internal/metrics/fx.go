@@ -66,9 +66,9 @@ var fxMetrics = []metricDefinition{
 		Labels: fmt.Sprintf("%s,%s,%s", GroupLabel, MemberIdLabel, ClientIdLabel),
 	},
 	{
-		Type:   COUNTER,
+		Type:   GAUGE,
 		Name:   ConsumerPauses,
-		Help:   "Total number of fetch pauses",
+		Help:   "Current pause state (1=paused, 0=running)",
 		Labels: ClientIdLabel,
 	},
 }
