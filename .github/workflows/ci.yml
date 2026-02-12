@@ -25,6 +25,8 @@ jobs:
       release-project-name: splitter
       release-type:         program
       release-main-package: ./cmd/splitter
+      release-arch-amd64:   true
+      release-arch-arm64:   true
       release-custom-file:  true
       release-docker:       true
       yaml-lint-skip:       false
