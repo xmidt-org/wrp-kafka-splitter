@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"xmidt-org/splitter/internal/log"
+	"xmidt-org/splitter/internal/metrics"
 	"xmidt-org/splitter/internal/observe"
 
 	"github.com/stretchr/testify/assert"
@@ -46,52 +48,91 @@ type WRPMessageHandlerTestSuite struct {
 	handler       *WRPMessageHandler
 	mockPublisher *MockWRPProducer
 	logEmitter    *observe.Subject[log.Event]
+	metricEmitter *observe.Subject[metrics.Event]
 	logEvents     []log.Event
-	logMutex      sync.Mutex // Protects logEvents slice
+	metricEvents  []metrics.Event
+	eventMutex    sync.Mutex // Protects event slices
 }
 
 func (suite *WRPMessageHandlerTestSuite) SetupTest() {
 	suite.mockPublisher = new(MockWRPProducer)
-	suite.logMutex.Lock()
+	suite.eventMutex.Lock()
 	suite.logEvents = make([]log.Event, 0)
-	suite.logMutex.Unlock()
+	suite.metricEvents = make([]metrics.Event, 0)
+	suite.eventMutex.Unlock()
 
 	suite.logEmitter = observe.NewSubject[log.Event]()
+	suite.metricEmitter = observe.NewSubject[metrics.Event]()
 
-	// Add observer to capture log events with proper synchronization
+	// Add observers to capture events with proper synchronization
 	suite.logEmitter.Attach(func(event log.Event) {
-		suite.logMutex.Lock()
-		defer suite.logMutex.Unlock()
+		suite.eventMutex.Lock()
+		defer suite.eventMutex.Unlock()
 		suite.logEvents = append(suite.logEvents, event)
+	})
+
+	suite.metricEmitter.Attach(func(event metrics.Event) {
+		suite.eventMutex.Lock()
+		defer suite.eventMutex.Unlock()
+		suite.metricEvents = append(suite.metricEvents, event)
 	})
 
 	// Create handler with nil producer (tests will use mock through interface)
 	suite.handler = &WRPMessageHandler{
-		producer:   nil, // Will be mocked through the WRPProducer interface
-		logEmitter: suite.logEmitter,
+		producer:      nil, // Will be mocked through the WRPProducer interface
+		logEmitter:    suite.logEmitter,
+		metricEmitter: suite.metricEmitter,
 	}
 }
 
-// Helper methods for thread-safe access to logEvents
+// Helper methods for thread-safe access to events
 func (suite *WRPMessageHandlerTestSuite) getLogEvents() []log.Event {
-	suite.logMutex.Lock()
-	defer suite.logMutex.Unlock()
+	suite.eventMutex.Lock()
+	defer suite.eventMutex.Unlock()
 	// Return a copy to avoid race conditions
 	events := make([]log.Event, len(suite.logEvents))
 	copy(events, suite.logEvents)
 	return events
 }
 
+func (suite *WRPMessageHandlerTestSuite) getMetricEvents() []metrics.Event {
+	suite.eventMutex.Lock()
+	defer suite.eventMutex.Unlock()
+	// Return a copy to avoid race conditions
+	events := make([]metrics.Event, len(suite.metricEvents))
+	copy(events, suite.metricEvents)
+	return events
+}
+
 func (suite *WRPMessageHandlerTestSuite) clearLogEvents() {
-	suite.logMutex.Lock()
-	defer suite.logMutex.Unlock()
+	suite.eventMutex.Lock()
+	defer suite.eventMutex.Unlock()
 	suite.logEvents = suite.logEvents[:0]
 }
 
+func (suite *WRPMessageHandlerTestSuite) clearMetricEvents() {
+	suite.eventMutex.Lock()
+	defer suite.eventMutex.Unlock()
+	suite.metricEvents = suite.metricEvents[:0]
+}
+
+func (suite *WRPMessageHandlerTestSuite) clearAllEvents() {
+	suite.eventMutex.Lock()
+	defer suite.eventMutex.Unlock()
+	suite.logEvents = suite.logEvents[:0]
+	suite.metricEvents = suite.metricEvents[:0]
+}
+
 func (suite *WRPMessageHandlerTestSuite) getLogEventCount() int {
-	suite.logMutex.Lock()
-	defer suite.logMutex.Unlock()
+	suite.eventMutex.Lock()
+	defer suite.eventMutex.Unlock()
 	return len(suite.logEvents)
+}
+
+func (suite *WRPMessageHandlerTestSuite) getMetricEventCount() int {
+	suite.eventMutex.Lock()
+	defer suite.eventMutex.Unlock()
+	return len(suite.metricEvents)
 }
 
 // Helper function to create MessagePack encoded WRP messages
@@ -453,6 +494,490 @@ func TestWRPMessageHandlerEdgeCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.test(t)
+		})
+	}
+}
+
+// Test Close method
+func (suite *WRPMessageHandlerTestSuite) TestClose() {
+	tests := []struct {
+		name         string
+		setupHandler func() *WRPMessageHandler
+		setupMock    func(*MockWRPProducer)
+		expectError  bool
+		description  string
+	}{
+		{
+			name: "close_with_producer",
+			setupHandler: func() *WRPMessageHandler {
+				return &WRPMessageHandler{
+					producer:      suite.mockPublisher,
+					logEmitter:    suite.logEmitter,
+					metricEmitter: suite.metricEmitter,
+				}
+			},
+			setupMock: func(mockPub *MockWRPProducer) {
+				mockPub.On("Stop", mock.Anything).Return(nil)
+			},
+			expectError: false,
+			description: "Should successfully close handler with producer",
+		},
+		{
+			name: "close_with_producer_error",
+			setupHandler: func() *WRPMessageHandler {
+				return &WRPMessageHandler{
+					producer:      suite.mockPublisher,
+					logEmitter:    suite.logEmitter,
+					metricEmitter: suite.metricEmitter,
+				}
+			},
+			setupMock: func(mockPub *MockWRPProducer) {
+				mockPub.On("Stop", mock.Anything).Return(errors.New("stop failed"))
+			},
+			expectError: true,
+			description: "Should return error when producer stop fails",
+		},
+		{
+			name: "close_with_nil_producer",
+			setupHandler: func() *WRPMessageHandler {
+				return &WRPMessageHandler{
+					producer:      nil,
+					logEmitter:    suite.logEmitter,
+					metricEmitter: suite.metricEmitter,
+				}
+			},
+			setupMock: func(mockPub *MockWRPProducer) {
+				// No expectations since producer is nil
+			},
+			expectError: false,
+			description: "Should handle nil producer gracefully",
+		},
+	}
+
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+			suite.mockPublisher = new(MockWRPProducer)
+			tt.setupMock(suite.mockPublisher)
+
+			handler := tt.setupHandler()
+			ctx := context.Background()
+
+			err := handler.Close(ctx)
+
+			if tt.expectError {
+				suite.Error(err, tt.description)
+			} else {
+				suite.NoError(err, tt.description)
+			}
+
+			suite.mockPublisher.AssertExpectations(suite.T())
+		})
+	}
+}
+
+// Test different WRP message types and content
+func (suite *WRPMessageHandlerTestSuite) TestHandleMessageTypes() {
+	tests := []struct {
+		name        string
+		message     *wrp.Message
+		expectError bool
+		description string
+	}{
+		{
+			name: "simple_event_message",
+			message: &wrp.Message{
+				Type:        wrp.SimpleEventMessageType,
+				Source:      "mac:112233445566/service",
+				Destination: "event:device-status/online",
+				Payload:     []byte(`{"event": "device online"}`),
+			},
+			expectError: false,
+			description: "Should handle SimpleEventMessageType",
+		},
+		{
+			name: "simple_request_response_message",
+			message: &wrp.Message{
+				Type:            wrp.SimpleRequestResponseMessageType,
+				Source:          "dns:webpa.example.com/api/v2/device",
+				Destination:     "mac:112233445566/config",
+				TransactionUUID: "txn-12345",
+				Payload:         []byte(`{"command": "get-status"}`),
+			},
+			expectError: false,
+			description: "Should handle SimpleRequestResponseMessageType",
+		},
+		{
+			name: "create_message",
+			message: &wrp.Message{
+				Type:            wrp.CreateMessageType,
+				Source:          "dns:webpa.example.com/api/v2/device",
+				Destination:     "mac:112233445566/config",
+				TransactionUUID: "test-txn-create-123",
+				Payload:         []byte(`{"parameters": {"Device.WiFi.SSID": "MyNetwork"}}`),
+			},
+			expectError: false,
+			description: "Should handle CreateMessageType",
+		},
+		{
+			name: "retrieve_message",
+			message: &wrp.Message{
+				Type:            wrp.RetrieveMessageType,
+				Source:          "dns:webpa.example.com/api/v2/device",
+				Destination:     "mac:112233445566/config",
+				TransactionUUID: "test-txn-retrieve-123",
+				Payload:         []byte(`{"names": ["Device.WiFi.SSID"]}`),
+			},
+			expectError: false,
+			description: "Should handle RetrieveMessageType",
+		},
+		{
+			name: "update_message",
+			message: &wrp.Message{
+				Type:            wrp.UpdateMessageType,
+				Source:          "dns:webpa.example.com/api/v2/device",
+				Destination:     "mac:112233445566/config",
+				TransactionUUID: "test-txn-update-123",
+				Payload:         []byte(`{"parameters": {"Device.WiFi.Password": "secret123"}}`),
+			},
+			expectError: false,
+			description: "Should handle UpdateMessageType",
+		},
+		{
+			name: "delete_message",
+			message: &wrp.Message{
+				Type:            wrp.DeleteMessageType,
+				Source:          "dns:webpa.example.com/api/v2/device",
+				Destination:     "mac:112233445566/config",
+				TransactionUUID: "test-txn-delete-123",
+				Payload:         []byte(`{"names": ["Device.WiFi.Password"]}`),
+			},
+			expectError: false,
+			description: "Should handle DeleteMessageType",
+		},
+		{
+			name: "message_with_headers",
+			message: &wrp.Message{
+				Type:        wrp.SimpleEventMessageType,
+				Source:      "mac:112233445566/service",
+				Destination: "event:device-status/online",
+				Headers:     []string{"X-Custom-Header", "custom-value"},
+				Payload:     []byte(`{"event": "device online with headers"}`),
+			},
+			expectError: false,
+			description: "Should handle messages with custom headers",
+		},
+		{
+			name: "message_with_metadata",
+			message: &wrp.Message{
+				Type:        wrp.SimpleEventMessageType,
+				Source:      "mac:112233445566/service",
+				Destination: "event:device-status/online",
+				Metadata:    map[string]string{"device-id": "112233445566", "region": "us-west-2"},
+				Payload:     []byte(`{"event": "device online with metadata"}`),
+			},
+			expectError: false,
+			description: "Should handle messages with metadata",
+		},
+	}
+
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+			suite.clearAllEvents()
+
+			// Setup mock expectations
+			suite.mockPublisher = new(MockWRPProducer)
+			if tt.expectError {
+				suite.mockPublisher.On("Produce", mock.Anything, mock.AnythingOfType("*wrp.Message")).
+					Return(wrpkafka.Failed, errors.New("produce failed"))
+			} else {
+				suite.mockPublisher.On("Produce", mock.Anything, mock.AnythingOfType("*wrp.Message")).
+					Return(wrpkafka.Attempted, nil)
+			}
+
+			// Create handler with mock
+			handler := &WRPMessageHandler{
+				producer:      suite.mockPublisher,
+				logEmitter:    suite.logEmitter,
+				metricEmitter: suite.metricEmitter,
+			}
+
+			// Create record
+			msgBytes, err := createMessagePackWRPMessage(tt.message)
+			suite.NoError(err)
+			record := createKafkaRecord("wrp-topic", []byte("test-key"), msgBytes)
+
+			// Execute
+			err = handler.HandleMessage(context.Background(), record)
+
+			if tt.expectError {
+				suite.Error(err, tt.description)
+			} else {
+				suite.NoError(err, tt.description)
+			}
+
+			suite.mockPublisher.AssertExpectations(suite.T())
+		})
+	}
+}
+
+// Test context cancellation scenarios
+func (suite *WRPMessageHandlerTestSuite) TestContextCancellation() {
+	tests := []struct {
+		name        string
+		setupCtx    func() (context.Context, context.CancelFunc)
+		expectError bool
+		description string
+	}{
+		{
+			name: "context_timeout",
+			setupCtx: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), 1*time.Nanosecond)
+			},
+			expectError: true,
+			description: "Should handle context timeout during processing",
+		},
+		{
+			name: "context_cancellation",
+			setupCtx: func() (context.Context, context.CancelFunc) {
+				ctx, cancel := context.WithCancel(context.Background())
+				// Cancel immediately
+				cancel()
+				return ctx, cancel
+			},
+			expectError: true,
+			description: "Should handle immediate context cancellation",
+		},
+		{
+			name: "valid_context",
+			setupCtx: func() (context.Context, context.CancelFunc) {
+				return context.WithCancel(context.Background())
+			},
+			expectError: false,
+			description: "Should work with valid context",
+		},
+	}
+
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+			suite.clearAllEvents()
+
+			// Setup mock
+			suite.mockPublisher = new(MockWRPProducer)
+			if tt.expectError {
+				suite.mockPublisher.On("Produce", mock.Anything, mock.AnythingOfType("*wrp.Message")).
+					Return(wrpkafka.Failed, context.Canceled)
+			} else {
+				suite.mockPublisher.On("Produce", mock.Anything, mock.AnythingOfType("*wrp.Message")).
+					Return(wrpkafka.Attempted, nil)
+			}
+
+			// Create handler
+			handler := &WRPMessageHandler{
+				producer:      suite.mockPublisher,
+				logEmitter:    suite.logEmitter,
+				metricEmitter: suite.metricEmitter,
+			}
+
+			// Create test message and record
+			msg := &wrp.Message{
+				Type:            wrp.SimpleEventMessageType,
+				Source:          "mac:112233445566/service",
+				Destination:     "event:device-status/online",
+				TransactionUUID: "test-txn-context-123",
+				Payload:         []byte(`{"test": "data"}`),
+			}
+			msgBytes, err := createMessagePackWRPMessage(msg)
+			suite.NoError(err)
+			record := createKafkaRecord("test-topic", []byte("key"), msgBytes)
+
+			// Setup context
+			ctx, cancel := tt.setupCtx()
+			defer cancel()
+
+			// Execute
+			err = handler.HandleMessage(ctx, record)
+
+			if tt.expectError {
+				suite.Error(err, tt.description)
+			} else {
+				suite.NoError(err, tt.description)
+			}
+		})
+	}
+}
+
+// Test concurrent message handling
+func (suite *WRPMessageHandlerTestSuite) TestConcurrentHandling() {
+	suite.clearAllEvents()
+
+	// Setup handler with mock
+	suite.mockPublisher = new(MockWRPProducer)
+	suite.mockPublisher.On("Produce", mock.Anything, mock.AnythingOfType("*wrp.Message")).
+		Return(wrpkafka.Attempted, nil).Times(50)
+
+	handler := &WRPMessageHandler{
+		producer:      suite.mockPublisher,
+		logEmitter:    suite.logEmitter,
+		metricEmitter: suite.metricEmitter,
+	}
+
+	// Create test message
+	msg := &wrp.Message{
+		Type:            wrp.SimpleEventMessageType,
+		Source:          "mac:112233445566/service",
+		Destination:     "event:device-status/concurrent",
+		TransactionUUID: "test-txn-concurrent-123",
+		Payload:         []byte(`{"test": "concurrent"}`),
+	}
+	msgBytes, err := createMessagePackWRPMessage(msg)
+	suite.NoError(err)
+
+	// Run concurrent handlers
+	var wg sync.WaitGroup
+	numGoroutines := 50
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+
+			record := createKafkaRecord("test-topic", []byte(fmt.Sprintf("key-%d", index)), msgBytes)
+			err := handler.HandleMessage(context.Background(), record)
+			suite.NoError(err, "Concurrent handler should succeed")
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Give time for async event processing
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify all mock expectations were met
+	suite.mockPublisher.AssertExpectations(suite.T())
+}
+
+// Test error scenarios and edge cases
+func (suite *WRPMessageHandlerTestSuite) TestErrorScenarios() {
+	tests := []struct {
+		name           string
+		setupRecord    func() *kgo.Record
+		setupMock      func(*MockWRPProducer)
+		expectError    bool
+		expectLogLevel log.Level
+		description    string
+	}{
+		{
+			name: "invalid_msgpack_data",
+			setupRecord: func() *kgo.Record {
+				// Invalid MessagePack data
+				return createKafkaRecord("test-topic", []byte("key"), []byte("invalid-msgpack-data"))
+			},
+			setupMock: func(mockPub *MockWRPProducer) {
+				// No expectations since decode will fail before producer call
+			},
+			expectError:    false, // Malformed messages don't return errors
+			expectLogLevel: log.LevelWarn,
+			description:    "Should handle invalid MessagePack gracefully",
+		},
+		{
+			name: "empty_record_value",
+			setupRecord: func() *kgo.Record {
+				return createKafkaRecord("test-topic", []byte("key"), []byte{})
+			},
+			setupMock: func(mockPub *MockWRPProducer) {
+				// No expectations since decode will fail
+			},
+			expectError:    false,
+			expectLogLevel: log.LevelWarn,
+			description:    "Should handle empty record value gracefully",
+		},
+		{
+			name: "producer_network_error",
+			setupRecord: func() *kgo.Record {
+				msg := &wrp.Message{
+					Type:            wrp.SimpleEventMessageType,
+					Source:          "mac:112233445566/service",
+					Destination:     "event:device-status/error",
+					TransactionUUID: "test-txn-error-123",
+					Payload:         []byte(`{"error": "network timeout"}`),
+				}
+				msgBytes, _ := createMessagePackWRPMessage(msg)
+				return createKafkaRecord("test-topic", []byte("key"), msgBytes)
+			},
+			setupMock: func(mockPub *MockWRPProducer) {
+				mockPub.On("Produce", mock.Anything, mock.AnythingOfType("*wrp.Message")).
+					Return(wrpkafka.Failed, errors.New("network timeout"))
+			},
+			expectError:    true,
+			expectLogLevel: log.LevelError,
+			description:    "Should return error on producer failure",
+		},
+		{
+			name: "large_message_payload",
+			setupRecord: func() *kgo.Record {
+				// Create a large payload (1MB)
+				largePayload := make([]byte, 1024*1024)
+				for i := range largePayload {
+					largePayload[i] = byte(i % 256)
+				}
+
+				msg := &wrp.Message{
+					Type:            wrp.SimpleEventMessageType,
+					Source:          "mac:112233445566/service",
+					Destination:     "event:device-status/large",
+					TransactionUUID: "test-txn-large-123",
+					Payload:         largePayload,
+				}
+				msgBytes, _ := createMessagePackWRPMessage(msg)
+				return createKafkaRecord("test-topic", []byte("key"), msgBytes)
+			},
+			setupMock: func(mockPub *MockWRPProducer) {
+				mockPub.On("Produce", mock.Anything, mock.AnythingOfType("*wrp.Message")).
+					Return(wrpkafka.Attempted, nil)
+			},
+			expectError:    false,
+			expectLogLevel: log.LevelDebug,
+			description:    "Should handle large message payloads",
+		},
+	}
+
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+			suite.clearAllEvents()
+
+			suite.mockPublisher = new(MockWRPProducer)
+			tt.setupMock(suite.mockPublisher)
+
+			handler := &WRPMessageHandler{
+				producer:      suite.mockPublisher,
+				logEmitter:    suite.logEmitter,
+				metricEmitter: suite.metricEmitter,
+			}
+
+			record := tt.setupRecord()
+			err := handler.HandleMessage(context.Background(), record)
+
+			if tt.expectError {
+				suite.Error(err, tt.description)
+			} else {
+				suite.NoError(err, tt.description)
+			}
+
+			// Verify log events
+			time.Sleep(10 * time.Millisecond) // Allow async events to process
+			logEvents := suite.getLogEvents()
+			if len(logEvents) > 0 {
+				found := false
+				for _, event := range logEvents {
+					if event.Level == tt.expectLogLevel {
+						found = true
+						break
+					}
+				}
+				suite.True(found, fmt.Sprintf("Expected log level %s not found", tt.expectLogLevel))
+			}
+
+			suite.mockPublisher.AssertExpectations(suite.T())
 		})
 	}
 }
