@@ -84,7 +84,6 @@ func New(opts ...Option) (*Consumer, error) {
 	}
 
 	consumer.client = client
-
 	return consumer, nil
 }
 

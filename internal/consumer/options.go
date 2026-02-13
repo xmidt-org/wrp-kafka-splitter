@@ -102,6 +102,7 @@ func WithGroupID(groupID string) Option {
 func WithMessageHandler(handler MessageHandler) Option {
 	return optionFunc(func(c *Consumer) error {
 		c.config.handler = handler
+		c.handler = handler
 		return nil
 	})
 }

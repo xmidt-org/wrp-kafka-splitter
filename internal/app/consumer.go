@@ -4,15 +4,14 @@
 package app
 
 import (
-	"context"
 	"fmt"
 
 	"xmidt-org/splitter/internal/consumer"
 	"xmidt-org/splitter/internal/log"
 	"xmidt-org/splitter/internal/metrics"
 	"xmidt-org/splitter/internal/observe"
+	"xmidt-org/splitter/internal/publisher"
 
-	"github.com/twmb/franz-go/pkg/kgo"
 	"go.uber.org/fx"
 )
 
@@ -20,6 +19,7 @@ import (
 type ConsumerIn struct {
 	fx.In
 	Config        consumer.Config
+	Publisher     *publisher.Publisher
 	LogEmitter    *observe.Subject[log.Event]
 	MetricEmitter *observe.Subject[metrics.Event]
 }
@@ -34,6 +34,13 @@ type ConsumerOut struct {
 func provideConsumer(in ConsumerIn) (ConsumerOut, error) {
 	cfg := in.Config
 
+	// Create the WRP message handler with the provided publisher
+	handler := consumer.NewWRPMessageHandler(consumer.WRPMessageHandlerConfig{
+		Producer:       in.Publisher,
+		LogEmitter:     in.LogEmitter,
+		MetricsEmitter: in.MetricEmitter,
+	})
+
 	// Build options from configuration - validation is handled by the option functions
 	opts := []consumer.Option{
 		// Observability
@@ -45,15 +52,8 @@ func provideConsumer(in ConsumerIn) (ConsumerOut, error) {
 		consumer.WithTopics(cfg.Topics...),
 		consumer.WithGroupID(cfg.GroupID),
 
-		// Message handler (placeholder - replace with actual implementation)
-		consumer.WithMessageHandler(
-			consumer.MessageHandlerFunc(func(ctx context.Context, record *kgo.Record) error {
-				// TODO: Replace with actual WRP message processing
-				fmt.Printf("Received message: topic=%s partition=%d offset=%d key=%s value=%s\n",
-					record.Topic, record.Partition, record.Offset, string(record.Key), string(record.Value))
-				return nil
-			}),
-		),
+		// Message handler
+		consumer.WithMessageHandler(consumer.MessageHandlerFunc(handler.HandleMessage)),
 
 		// Client identification
 		consumer.WithClientID(cfg.ClientID),

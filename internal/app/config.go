@@ -10,6 +10,7 @@ import (
 
 	"xmidt-org/splitter/internal/configuration"
 	"xmidt-org/splitter/internal/consumer"
+	"xmidt-org/splitter/internal/publisher"
 
 	"github.com/goschtalt/goschtalt"
 	_ "github.com/goschtalt/goschtalt/pkg/typical"
@@ -33,6 +34,7 @@ type Config struct {
 	Prometheus        touchstone.Config
 	PrometheusHandler touchhttp.Config
 	Servers           Servers
+	Producer          publisher.Config
 	Consumer          consumer.Config
 }
 

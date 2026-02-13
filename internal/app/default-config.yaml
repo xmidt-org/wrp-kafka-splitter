@@ -39,6 +39,17 @@ prometheus_handler:
   max_requests_in_flight: 5
   timeout: 5s
 
+producer:
+  brokers:
+    - "localhost:9092"
+  topic_routes:
+    - pattern: "device-lifecycle"
+      topic: "device-lifecycle"
+    - pattern: "device-status"
+      topic: "device-status"
+    - pattern: "*"
+      topic: "default-events"
+
 # Kafka Consumer Configuration
 consumer:
   # Required: List of Kafka broker addresses

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 	"xmidt-org/splitter/internal/consumer"
+	"xmidt-org/splitter/internal/publisher"
 
 	"github.com/goschtalt/goschtalt"
 	"go.uber.org/fx"
@@ -38,9 +39,10 @@ type CLI struct {
 
 type LifeCycleIn struct {
 	fx.In
-	Logger   *slog.Logger
-	LC       fx.Lifecycle
-	Consumer *consumer.Consumer
+	Logger    *slog.Logger
+	LC        fx.Lifecycle
+	Publisher *publisher.Publisher
+	Consumer  *consumer.Consumer
 }
 
 // WrpKafkaRouter is the main entry point for the program.  It is responsible for
@@ -66,16 +68,21 @@ func provideAppOptions(args []string) fx.Option {
 }
 
 // CoreModule provides the core business logic:
+// - Kafka publisher setup for WRP message routing
 // - Kafka consumer setup with message handling
 // - Consumer lifecycle management (OnStart/OnStop hooks)
 func CoreModule() fx.Option {
 	return fx.Module("core",
-		// Consumer configuration must be unmarshaled first
+		// Consumer configuration must be unmarshaled
 		fx.Provide(
 			goschtalt.UnmarshalFunc[consumer.Config]("consumer"),
 		),
-		// Consumer is the main business logic component
+		// Publisher configuration must be unmarshaled
 		fx.Provide(
+			goschtalt.UnmarshalFunc[publisher.Config]("producer"),
+		),
+		fx.Provide(
+			providePublisher,
 			provideConsumer,
 		),
 
@@ -86,15 +93,26 @@ func CoreModule() fx.Option {
 	)
 }
 
-func onStart(logger *slog.Logger, consumer *consumer.Consumer) func(context.Context) error {
+func onStart(logger *slog.Logger, publisher *publisher.Publisher, consumer *consumer.Consumer) func(context.Context) error {
 	return func(ctx context.Context) (err error) {
 		if err = ctx.Err(); err != nil {
 			return err
 		}
 
+		// Start the publisher first (required by consumer)
+		if err = publisher.Start(); err != nil {
+			logger.Error("failed to start publisher", "error", err)
+			return err
+		}
+		logger.Info("publisher started successfully")
+
 		// Start the Kafka consumer
 		if err = consumer.Start(); err != nil {
 			logger.Error("failed to start consumer", "error", err)
+			// Stop the publisher if consumer fails to start
+			if stopErr := publisher.Stop(ctx); stopErr != nil {
+				logger.Error("failed to stop publisher during cleanup", "error", stopErr)
+			}
 			return err
 		}
 
@@ -103,21 +121,29 @@ func onStart(logger *slog.Logger, consumer *consumer.Consumer) func(context.Cont
 	}
 }
 
-func onStop(logger *slog.Logger, consumer *consumer.Consumer) func(context.Context) error {
+func onStop(logger *slog.Logger, publisher *publisher.Publisher, consumer *consumer.Consumer) func(context.Context) error {
 	return func(ctx context.Context) error {
-		logger.Info("stopping consumer")
+		logger.Info("stopping services")
 
 		// Create a timeout context for the shutdown
 		shutdownCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 		defer cancel()
 
-		// Stop the consumer with the shutdown context
+		// Stop the consumer first
 		if err := consumer.Stop(shutdownCtx); err != nil {
 			logger.Error("error stopping consumer", "error", err)
+			// Continue to stop publisher even if consumer fails
+		} else {
+			logger.Info("consumer stopped successfully")
+		}
+
+		// Stop the publisher
+		if err := publisher.Stop(shutdownCtx); err != nil {
+			logger.Error("error stopping publisher", "error", err)
 			return err
 		}
 
-		logger.Info("consumer stopped successfully")
+		logger.Info("publisher stopped successfully")
 		return nil
 	}
 }
@@ -126,8 +152,8 @@ func lifeCycle(in LifeCycleIn) {
 	logger := in.Logger.With("component", "fx_lifecycle")
 	in.LC.Append(
 		fx.Hook{
-			OnStart: onStart(logger, in.Consumer),
-			OnStop:  onStop(logger, in.Consumer),
+			OnStart: onStart(logger, in.Publisher, in.Consumer),
+			OnStop:  onStop(logger, in.Publisher, in.Consumer),
 		},
 	)
 }
