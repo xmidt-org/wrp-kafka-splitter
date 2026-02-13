@@ -27,6 +27,6 @@ jobs:
       release-main-package: ./cmd/splitter
       release-arch-amd64:   true
       release-arch-arm64:   true
-      release-docker:       true
+      release-docker:       false
       yaml-lint-skip:       false
     secrets: inherit
