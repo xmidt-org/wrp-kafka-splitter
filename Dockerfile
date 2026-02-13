@@ -27,7 +27,7 @@ COPY LICENSE    /
 
 # Make the location for the configuration file that will be used.
 RUN     mkdir /etc/splitter/
-COPY .release/docker/config/config.yaml  /etc/splitter/splitter.yaml
+#COPY .release/docker/config/config.yaml  /etc/splitter/splitter.yaml
 
 USER root
 
