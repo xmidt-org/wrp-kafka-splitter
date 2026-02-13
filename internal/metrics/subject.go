@@ -10,7 +10,9 @@ import (
 )
 
 type Metrics struct {
-	ConsumerErrors kit.Counter
+	ConsumerFetchErrors  kit.Counter
+	ConsumerCommitErrors kit.Counter
+	ConsumerPauses       kit.Gauge
 }
 
 type Metric struct {
@@ -32,11 +34,11 @@ func New(m Metrics) *observe.Subject[Event] {
 	return subject
 }
 
-// using touchkit gives us less control over creating the metrics.  Ideally we
-// should create the listeners at the same time we register the metrics
 func createObservers(m Metrics) []*Observer {
 	observers := []*Observer{
-		NewObserver(ConsumerErrors, COUNTER, Metric{counter: m.ConsumerErrors}),
+		NewObserver(ConsumerFetchErrors, COUNTER, Metric{counter: m.ConsumerFetchErrors}),
+		NewObserver(ConsumerCommitErrors, COUNTER, Metric{counter: m.ConsumerCommitErrors}),
+		NewObserver(ConsumerPauses, GAUGE, Metric{gauge: m.ConsumerPauses}),
 	}
 	return observers
 }

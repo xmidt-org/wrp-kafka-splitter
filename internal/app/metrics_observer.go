@@ -14,7 +14,9 @@ import (
 
 type MetricsIn struct {
 	fx.In
-	ConsumerErrors kit.Counter `name:"consumer_errors"`
+	ConsumerFetchErrors  kit.Counter `name:"fetch_errors"`
+	ConsumerCommitErrors kit.Counter `name:"commit_errors"`
+	ConsumerPauses       kit.Gauge   `name:"fetch_pauses"`
 }
 
 type metricsObserverIn struct {
@@ -31,7 +33,9 @@ var MetricObserversModule = fx.Module("metrics_observers",
 	fx.Provide(
 		func(in MetricsIn) metrics.Metrics {
 			return metrics.Metrics{
-				ConsumerErrors: in.ConsumerErrors,
+				ConsumerFetchErrors:  in.ConsumerFetchErrors,
+				ConsumerCommitErrors: in.ConsumerCommitErrors,
+				ConsumerPauses:       in.ConsumerPauses,
 			}
 		}),
 	fx.Provide(

@@ -31,7 +31,9 @@ type metricDefinition struct {
 
 // metrics
 const (
-	ConsumerErrors = "consumer_errors"
+	ConsumerFetchErrors  = "fetch_errors"
+	ConsumerCommitErrors = "commit_errors"
+	ConsumerPauses       = "fetch_pauses"
 )
 
 // labels
@@ -39,14 +41,35 @@ const (
 	ErrorTypeLabel = "type"
 	TopicLabel     = "topic"
 	PartitionLabel = "partition"
+	GroupLabel     = "group"
+	MemberIdLabel  = "member"
+	ClientIdLabel  = "client"
+)
+
+// canned values
+const (
+	OutcomeSuccess = "success"
+	OutcomeFailure = "failure"
 )
 
 var fxMetrics = []metricDefinition{
 	{
 		Type:   COUNTER,
-		Name:   ConsumerErrors,
-		Help:   "Total number of consumer errors of a given type",
-		Labels: fmt.Sprintf("%s,%s,%s", PartitionLabel, TopicLabel, ErrorTypeLabel),
+		Name:   ConsumerFetchErrors,
+		Help:   "Total number of fetch errors",
+		Labels: fmt.Sprintf("%s,%s,%s", PartitionLabel, TopicLabel, ClientIdLabel),
+	},
+	{
+		Type:   COUNTER,
+		Name:   ConsumerCommitErrors,
+		Help:   "Total number of commit errors",
+		Labels: fmt.Sprintf("%s,%s,%s", GroupLabel, MemberIdLabel, ClientIdLabel),
+	},
+	{
+		Type:   GAUGE,
+		Name:   ConsumerPauses,
+		Help:   "Current pause state (1=paused, 0=running)",
+		Labels: ClientIdLabel,
 	},
 }
 

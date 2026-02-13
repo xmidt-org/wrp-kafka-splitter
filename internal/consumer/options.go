@@ -42,11 +42,10 @@ func (f optionFunc) apply(c *Consumer) error {
 // consumerConfig holds the configuration for a Consumer.
 type consumerConfig struct {
 	// Required options
-	brokers            []string
-	topics             []string
-	groupID            string
-	handler            MessageHandler
-	autocommitDisabled bool
+	brokers []string
+	topics  []string
+	groupID string
+	handler MessageHandler
 
 	// franz-go client options
 	kgoOpts []kgo.Opt
@@ -66,6 +65,7 @@ func validate(config *consumerConfig) error {
 	if config.handler == nil {
 		return errors.New("message handler is required")
 	}
+
 	return nil
 }
 
@@ -206,18 +206,6 @@ func WithAutoCommitInterval(interval time.Duration) Option {
 	return optionFunc(func(c *Consumer) error {
 		if interval > 0 {
 			c.config.kgoOpts = append(c.config.kgoOpts, kgo.AutoCommitInterval(interval))
-		}
-		return nil
-	})
-}
-
-// WithDisableAutoCommit disables automatic offset committing.
-// When disabled, the application is responsible for committing offsets.
-func WithDisableAutoCommit(disable bool) Option {
-	return optionFunc(func(c *Consumer) error {
-		if disable {
-			c.config.kgoOpts = append(c.config.kgoOpts, kgo.DisableAutoCommit())
-			c.config.autocommitDisabled = true
 		}
 		return nil
 	})
@@ -558,6 +546,7 @@ func WithOnPartitionsLost(fn func(context.Context, *kgo.Client, map[string][]int
 func WithClientID(clientID string) Option {
 	return optionFunc(func(c *Consumer) error {
 		if clientID != "" {
+			c.clientId = clientID
 			c.config.kgoOpts = append(c.config.kgoOpts, kgo.ClientID(clientID))
 		}
 		return nil

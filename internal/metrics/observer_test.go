@@ -6,7 +6,6 @@ package metrics
 import (
 	"testing"
 
-	kit "github.com/go-kit/kit/metrics"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -16,65 +15,6 @@ type ObserverTestSuite struct {
 
 func TestObserverTestSuite(t *testing.T) {
 	suite.Run(t, new(ObserverTestSuite))
-}
-
-// mockCounter is a mock implementation of kit.Counter
-type mockCounter struct {
-	addCalled  bool
-	addValue   float64
-	withLabels []string
-}
-
-func (m *mockCounter) With(labelValues ...string) kit.Counter {
-	// Store the labels and return self to track the Add call
-	m.withLabels = append([]string{}, labelValues...)
-	return m
-}
-
-func (m *mockCounter) Add(delta float64) {
-	m.addCalled = true
-	m.addValue += delta
-}
-
-// mockGauge is a mock implementation of kit.Gauge
-type mockGauge struct {
-	setCalled  bool
-	setValue   float64
-	addCalled  bool
-	addValue   float64
-	withLabels []string
-}
-
-func (m *mockGauge) With(labelValues ...string) kit.Gauge {
-	m.withLabels = append([]string{}, labelValues...)
-	return m
-}
-
-func (m *mockGauge) Set(value float64) {
-	m.setCalled = true
-	m.setValue = value
-}
-
-func (m *mockGauge) Add(delta float64) {
-	m.addCalled = true
-	m.addValue += delta
-}
-
-// mockHistogram is a mock implementation of kit.Histogram
-type mockHistogram struct {
-	observeCalled bool
-	observeValue  float64
-	withLabels    []string
-}
-
-func (m *mockHistogram) With(labelValues ...string) kit.Histogram {
-	m.withLabels = append([]string{}, labelValues...)
-	return m
-}
-
-func (m *mockHistogram) Observe(value float64) {
-	m.observeCalled = true
-	m.observeValue = value
 }
 
 // TestNewObserver tests creating new observers
@@ -119,13 +59,13 @@ func (s *ObserverTestSuite) TestNewObserver() {
 		s.Run(tt.name, func() {
 			var metric Metric
 			if tt.hasCounter {
-				metric.counter = &mockCounter{}
+				metric.counter = &MockCounter{}
 			}
 			if tt.hasGauge {
-				metric.gauge = &mockGauge{}
+				metric.gauge = &MockGauge{}
 			}
 			if tt.hasHistogram {
-				metric.histogram = &mockHistogram{}
+				metric.histogram = &MockHistogram{}
 			}
 
 			observer := NewObserver(tt.metricName, tt.metricType, metric)
@@ -139,7 +79,10 @@ func (s *ObserverTestSuite) TestNewObserver() {
 
 // TestObserver_HandleEvent_Counter tests handling counter events
 func (s *ObserverTestSuite) TestObserver_HandleEvent_Counter() {
-	counter := &mockCounter{}
+	counter := &MockCounter{}
+	counter.On("With", []string{"label1", "value1"}).Return(counter)
+	counter.On("Add", 5.0).Return()
+
 	observer := NewObserver("test_counter", COUNTER, Metric{counter: counter})
 
 	event := Event{
@@ -150,14 +93,15 @@ func (s *ObserverTestSuite) TestObserver_HandleEvent_Counter() {
 
 	observer.HandleEvent(event)
 
-	s.True(counter.addCalled)
-	s.Equal(5.0, counter.addValue)
-	s.Equal([]string{"label1", "value1"}, counter.withLabels)
+	counter.AssertExpectations(s.T())
 }
 
 // TestObserver_HandleEvent_Gauge tests handling gauge events
 func (s *ObserverTestSuite) TestObserver_HandleEvent_Gauge() {
-	gauge := &mockGauge{}
+	gauge := &MockGauge{}
+	gauge.On("With", []string{"label1", "value1"}).Return(gauge)
+	gauge.On("Set", 42.5).Return()
+
 	observer := NewObserver("test_gauge", GAUGE, Metric{gauge: gauge})
 
 	event := Event{
@@ -168,14 +112,15 @@ func (s *ObserverTestSuite) TestObserver_HandleEvent_Gauge() {
 
 	observer.HandleEvent(event)
 
-	s.True(gauge.setCalled)
-	s.Equal(42.5, gauge.setValue)
-	s.Equal([]string{"label1", "value1"}, gauge.withLabels)
+	gauge.AssertExpectations(s.T())
 }
 
 // TestObserver_HandleEvent_Histogram tests handling histogram events
 func (s *ObserverTestSuite) TestObserver_HandleEvent_Histogram() {
-	histogram := &mockHistogram{}
+	histogram := &MockHistogram{}
+	histogram.On("With", []string{"label1", "value1"}).Return(histogram)
+	histogram.On("Observe", 0.125).Return()
+
 	observer := NewObserver("test_histogram", HISTOGRAM, Metric{histogram: histogram})
 
 	event := Event{
@@ -186,14 +131,14 @@ func (s *ObserverTestSuite) TestObserver_HandleEvent_Histogram() {
 
 	observer.HandleEvent(event)
 
-	s.True(histogram.observeCalled)
-	s.Equal(0.125, histogram.observeValue)
-	s.Equal([]string{"label1", "value1"}, histogram.withLabels)
+	histogram.AssertExpectations(s.T())
 }
 
 // TestObserver_HandleEvent_WrongName tests that events with wrong names are ignored
 func (s *ObserverTestSuite) TestObserver_HandleEvent_WrongName() {
-	counter := &mockCounter{}
+	counter := &MockCounter{}
+	// No expectations set - method should not be called
+
 	observer := NewObserver("test_counter", COUNTER, Metric{counter: counter})
 
 	event := Event{
@@ -205,7 +150,8 @@ func (s *ObserverTestSuite) TestObserver_HandleEvent_WrongName() {
 	observer.HandleEvent(event)
 
 	// Should not be called because name doesn't match
-	s.False(counter.addCalled)
+	counter.AssertNotCalled(s.T(), "With")
+	counter.AssertNotCalled(s.T(), "Add")
 }
 
 // TestObserver_HandleEvent_NilCounter tests handling events when counter is nil
@@ -258,7 +204,10 @@ func (s *ObserverTestSuite) TestObserver_HandleEvent_NilHistogram() {
 
 // TestObserver_HandleEvent_EmptyLabels tests handling events with empty labels
 func (s *ObserverTestSuite) TestObserver_HandleEvent_EmptyLabels() {
-	counter := &mockCounter{}
+	counter := &MockCounter{}
+	counter.On("With", []string{}).Return(counter)
+	counter.On("Add", 10.0).Return()
+
 	observer := NewObserver("test_counter", COUNTER, Metric{counter: counter})
 
 	event := Event{
@@ -269,27 +218,25 @@ func (s *ObserverTestSuite) TestObserver_HandleEvent_EmptyLabels() {
 
 	observer.HandleEvent(event)
 
-	s.True(counter.addCalled)
-	s.Equal(10.0, counter.addValue)
-	s.Equal([]string{}, counter.withLabels)
+	counter.AssertExpectations(s.T())
 }
 
 // TestObserver_HandleEvent_MultipleLabels tests handling events with multiple label pairs
 func (s *ObserverTestSuite) TestObserver_HandleEvent_MultipleLabels() {
-	counter := &mockCounter{}
-	observer := NewObserver(ConsumerErrors, COUNTER, Metric{counter: counter})
+	counter := &MockCounter{}
+	expectedLabels := []string{PartitionLabel, "0", TopicLabel, "test-topic", ErrorTypeLabel, "decode_error"}
+	counter.On("With", expectedLabels).Return(counter)
+	counter.On("Add", 1.0).Return()
+
+	observer := NewObserver(ConsumerFetchErrors, COUNTER, Metric{counter: counter})
 
 	event := Event{
-		Name:   ConsumerErrors,
-		Labels: []string{PartitionLabel, "0", TopicLabel, "test-topic", ErrorTypeLabel, "decode_error"},
+		Name:   ConsumerFetchErrors,
+		Labels: expectedLabels,
 		Value:  1.0,
 	}
 
 	observer.HandleEvent(event)
 
-	s.True(counter.addCalled)
-	s.Equal(1.0, counter.addValue)
-	s.Contains(counter.withLabels, PartitionLabel)
-	s.Contains(counter.withLabels, TopicLabel)
-	s.Contains(counter.withLabels, ErrorTypeLabel)
+	counter.AssertExpectations(s.T())
 }

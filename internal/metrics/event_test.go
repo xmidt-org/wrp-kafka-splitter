@@ -94,13 +94,13 @@ func (s *EventTestSuite) TestEvent_Creation() {
 // TestEvent_ConsumerErrors tests creating consumer error events
 func (s *EventTestSuite) TestEvent_ConsumerErrors() {
 	event := Event{
-		Name:   ConsumerErrors,
+		Name:   ConsumerFetchErrors,
 		Labels: []string{PartitionLabel, "0", TopicLabel, "test-topic", ErrorTypeLabel, "decode_error"},
 		Value:  1.0,
 	}
 
-	s.Equal(ConsumerErrors, event.Name)
-	s.Equal("consumer_errors", event.Name)
+	s.Equal(ConsumerFetchErrors, event.Name)
+	s.Equal("fetch_errors", event.Name)
 	s.Contains(event.Labels, PartitionLabel)
 	s.Contains(event.Labels, TopicLabel)
 	s.Contains(event.Labels, ErrorTypeLabel)

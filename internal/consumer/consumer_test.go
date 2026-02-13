@@ -6,359 +6,697 @@ package consumer
 import (
 	"context"
 	"errors"
-	"sync"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/suite"
-	"github.com/twmb/franz-go/pkg/kgo"
-
 	"xmidt-org/splitter/internal/log"
 	"xmidt-org/splitter/internal/metrics"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
+	"github.com/twmb/franz-go/pkg/kerr"
+	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/xmidt-org/wrpkafka"
 )
 
-// ConsumerTestSuite is the test suite for the Consumer
+// ConsumerTestSuite is the test suite for Consumer functionality
 type ConsumerTestSuite struct {
 	suite.Suite
-	mock    *mockClient
-	handler MessageHandler
+	mockClient *MockClient
+	consumer   *Consumer
 }
 
-// SetupTest is called before each test
+func TestConsumerTestSuite(t *testing.T) {
+	suite.Run(t, new(ConsumerTestSuite))
+}
+
 func (s *ConsumerTestSuite) SetupTest() {
-	s.mock = newMockClient()
-	s.handler = MessageHandlerFunc(func(ctx context.Context, record *kgo.Record) error {
-		return nil
-	})
+	s.mockClient = &MockClient{}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	s.consumer = &Consumer{
+		client:  s.mockClient,
+		handler: &MockHandler{},
+		config: &consumerConfig{
+			brokers: []string{"localhost:9092"},
+			topics:  []string{"test-topic"},
+			groupID: "test-group",
+		},
+		logEmitter:            log.NewNoop(),
+		metricEmitter:         metrics.NewNoop(),
+		ctx:                   ctx,
+		cancel:                cancel,
+		pauseThresholdSeconds: 60,
+		resumeDelaySeconds:    30,
+	}
+	s.consumer.timeSinceLastSuccess.Store(time.Now().Unix())
 }
 
-// TestNew_RequiredOptions tests that New validates required options
-func (s *ConsumerTestSuite) TestNew_RequiredOptions() {
+func (s *ConsumerTestSuite) TearDownTest() {
+	if s.consumer != nil && s.consumer.cancel != nil {
+		s.consumer.cancel()
+	}
+}
+
+// TestNew tests consumer creation with various option combinations
+func (s *ConsumerTestSuite) TestNew() {
 	tests := []struct {
 		name        string
 		opts        []Option
-		expectedErr string
+		expectError bool
+		errorMsg    string
 	}{
 		{
-			name:        "missing all required options",
-			opts:        []Option{},
-			expectedErr: "brokers are required",
+			name: "valid consumer with all required options",
+			opts: []Option{
+				WithBrokers("localhost:9092"),
+				WithTopics("topic1", "topic2"),
+				WithGroupID("test-group"),
+				WithMessageHandler(&MockHandler{}),
+			},
+			expectError: false,
+		},
+		{
+			name: "missing brokers",
+			opts: []Option{
+				WithTopics("topic1"),
+				WithGroupID("test-group"),
+				WithMessageHandler(&MockHandler{}),
+			},
+			expectError: true,
+			errorMsg:    "brokers",
 		},
 		{
 			name: "missing topics",
 			opts: []Option{
 				WithBrokers("localhost:9092"),
+				WithGroupID("test-group"),
+				WithMessageHandler(&MockHandler{}),
 			},
-			expectedErr: "topics are required",
+			expectError: true,
+			errorMsg:    "topics",
 		},
 		{
 			name: "missing group ID",
 			opts: []Option{
 				WithBrokers("localhost:9092"),
-				WithTopics("test-topic"),
+				WithTopics("topic1"),
+				WithMessageHandler(&MockHandler{}),
 			},
-			expectedErr: "group ID is required",
+			expectError: true,
+			errorMsg:    "group",
 		},
 		{
 			name: "missing handler",
 			opts: []Option{
 				WithBrokers("localhost:9092"),
-				WithTopics("test-topic"),
+				WithTopics("topic1"),
 				WithGroupID("test-group"),
 			},
-			expectedErr: "message handler is required",
+			expectError: true,
+			errorMsg:    "handler",
 		},
 	}
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c, err := New(tt.opts...)
-			s.Error(err)
-			s.Nil(c)
-			s.Contains(err.Error(), tt.expectedErr)
+			consumer, err := New(tt.opts...)
+
+			if tt.expectError {
+				s.Error(err)
+				if tt.errorMsg != "" {
+					s.Contains(err.Error(), tt.errorMsg)
+				}
+				s.Nil(consumer)
+			} else {
+				s.NoError(err)
+				s.NotNil(consumer)
+				if consumer != nil {
+					consumer.cancel()
+				}
+			}
 		})
 	}
 }
 
-// TestNew_ValidConfiguration tests successful consumer creation
-func (s *ConsumerTestSuite) TestNew_ValidConfiguration() {
-	c, err := New(
-		WithBrokers("localhost:9092"),
-		WithTopics("test-topic"),
-		WithGroupID("test-group"),
-		WithMessageHandler(s.handler),
-	)
-
-	s.NoError(err)
-	s.NotNil(c)
-	s.False(c.IsRunning())
-}
-
-// TestNew_WithOptionalOptions tests consumer creation with optional options
-func (s *ConsumerTestSuite) TestNew_WithOptionalOptions() {
-	c, err := New(
-		WithBrokers("localhost:9092", "localhost:9093"),
-		WithTopics("topic1", "topic2"),
-		WithGroupID("test-group"),
-		WithMessageHandler(s.handler),
-		WithSessionTimeout(60*time.Second),
-		WithClientID("test-client"),
-	)
-
-	s.NoError(err)
-	s.NotNil(c)
-}
-
-// TestConsumer_IsRunning tests the IsRunning method
-func (s *ConsumerTestSuite) TestConsumer_IsRunning() {
-	c := &Consumer{}
-	s.False(c.IsRunning())
-
-	c.mu.Lock()
-	c.running = true
-	c.mu.Unlock()
-
-	s.True(c.IsRunning())
-}
-
-// TestConsumer_Start_Success tests successful consumer start
-func (s *ConsumerTestSuite) TestConsumer_Start_Success() {
-	c := &Consumer{
-		client:  s.mock,
-		handler: s.handler,
-		config:  &consumerConfig{},
-	}
-	c.ctx, c.cancel = context.WithCancel(context.Background())
-	c.logEmitter = log.NewNoop()
-	c.metricEmitter = metrics.NewNoop()
-
-	err := c.Start()
-	s.NoError(err)
-
-	// Give pollLoop time to start
-	time.Sleep(50 * time.Millisecond)
-
-	s.True(c.IsRunning())
-	s.True(s.mock.wasPingCalled())
-
-	// Cleanup
-	err = c.Stop(context.Background())
-	s.NoError(err)
-}
-
-// TestConsumer_Start_AlreadyRunning tests starting an already running consumer
-func (s *ConsumerTestSuite) TestConsumer_Start_AlreadyRunning() {
-	c := &Consumer{
-		client:  s.mock,
-		handler: s.handler,
-		config:  &consumerConfig{},
-	}
-	c.ctx, c.cancel = context.WithCancel(context.Background())
-	c.logEmitter = log.NewNoop()
-	c.metricEmitter = metrics.NewNoop()
-
-	err := c.Start()
-	s.NoError(err)
-	defer c.Stop(context.Background())
-
-	// Try to start again
-	err = c.Start()
-	s.Error(err)
-	s.Contains(err.Error(), "consumer is already running")
-}
-
-// TestConsumer_Start_PingFailure tests start with ping failure
-func (s *ConsumerTestSuite) TestConsumer_Start_PingFailure() {
-	s.mock.pingFn = func(ctx context.Context) error {
-		return errors.New("ping failed")
+// TestStart tests consumer startup scenarios
+func (s *ConsumerTestSuite) TestStart() {
+	tests := []struct {
+		name        string
+		setupMock   func(*MockClient)
+		isRunning   bool
+		expectError bool
+		errorType   error
+	}{
+		{
+			name: "successful start",
+			setupMock: func(m *MockClient) {
+				m.On("Ping", s.consumer.ctx).Return(nil)
+			},
+			isRunning:   false,
+			expectError: false,
+		},
+		{
+			name: "already running",
+			setupMock: func(m *MockClient) {
+				// No ping expected
+			},
+			isRunning:   true,
+			expectError: true,
+		},
+		{
+			name: "ping fails",
+			setupMock: func(m *MockClient) {
+				m.On("Ping", s.consumer.ctx).Return(errors.New("connection failed"))
+			},
+			isRunning:   false,
+			expectError: true,
+			errorType:   ErrPingingBroker,
+		},
 	}
 
-	c := &Consumer{
-		client:  s.mock,
-		handler: s.handler,
-		config:  &consumerConfig{},
-	}
-	c.ctx, c.cancel = context.WithCancel(context.Background())
-	c.logEmitter = log.NewNoop()
-	c.metricEmitter = metrics.NewNoop()
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			// Reset mock for each test
+			s.mockClient = &MockClient{}
+			s.consumer.client = s.mockClient
+			s.consumer.running = tt.isRunning
 
-	err := c.Start()
-	s.Error(err)
-	s.False(c.IsRunning())
+			if tt.setupMock != nil {
+				tt.setupMock(s.mockClient)
+			}
+
+			err := s.consumer.Start()
+
+			if tt.expectError {
+				s.Error(err)
+				if tt.errorType != nil {
+					s.ErrorIs(err, tt.errorType)
+				}
+			} else {
+				s.NoError(err)
+				s.True(s.consumer.IsRunning())
+
+				// Clean up goroutines
+				s.consumer.cancel()
+				s.consumer.wg.Wait()
+			}
+
+			s.mockClient.AssertExpectations(s.T())
+		})
+	}
 }
 
-// TestConsumer_Stop tests graceful consumer shutdown
-func (s *ConsumerTestSuite) TestConsumer_Stop() {
-	c := &Consumer{
-		client:  s.mock,
-		handler: s.handler,
-		config:  &consumerConfig{},
+// TestStop tests consumer shutdown scenarios
+func (s *ConsumerTestSuite) TestStop() {
+	tests := []struct {
+		name        string
+		setupMock   func(*MockClient)
+		isRunning   bool
+		timeout     time.Duration
+		expectError bool
+	}{
+		{
+			name: "graceful stop",
+			setupMock: func(m *MockClient) {
+				m.On("Close").Return()
+			},
+			isRunning:   true,
+			timeout:     5 * time.Second,
+			expectError: false,
+		},
+		{
+			name: "not running",
+			setupMock: func(m *MockClient) {
+				// No close expected
+			},
+			isRunning:   false,
+			timeout:     5 * time.Second,
+			expectError: true,
+		},
 	}
-	c.ctx, c.cancel = context.WithCancel(context.Background())
-	c.logEmitter = log.NewNoop()
-	c.metricEmitter = metrics.NewNoop()
 
-	err := c.Start()
-	s.NoError(err)
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.mockClient = &MockClient{}
+			s.consumer.client = s.mockClient
+			s.consumer.running = tt.isRunning
 
-	// Give pollLoop time to start
-	time.Sleep(50 * time.Millisecond)
+			if tt.setupMock != nil {
+				tt.setupMock(s.mockClient)
+			}
 
-	err = c.Stop(context.Background())
-	s.NoError(err)
+			ctx, cancel := context.WithTimeout(context.Background(), tt.timeout)
+			defer cancel()
 
-	s.False(c.IsRunning())
-	s.True(s.mock.wasCloseCalled())
+			err := s.consumer.Stop(ctx)
+
+			if tt.expectError {
+				s.Error(err)
+			} else {
+				s.NoError(err)
+				s.False(s.consumer.IsRunning())
+			}
+
+			s.mockClient.AssertExpectations(s.T())
+		})
+	}
 }
 
-// TestConsumer_Stop_NotRunning tests stopping a non-running consumer
-func (s *ConsumerTestSuite) TestConsumer_Stop_NotRunning() {
-	c := &Consumer{
-		client:  s.mock,
-		handler: s.handler,
-		config:  &consumerConfig{},
-	}
-	c.ctx, c.cancel = context.WithCancel(context.Background())
-	c.logEmitter = log.NewNoop()
-	c.metricEmitter = metrics.NewNoop()
-
-	// Stop without starting should return error
-	err := c.Stop(context.Background())
-	s.Error(err)
-	s.Contains(err.Error(), "consumer is not running")
-	s.False(c.IsRunning())
-}
-
-// TestConsumer_HandleRecord_Success tests successful message handling
-func (s *ConsumerTestSuite) TestConsumer_HandleRecord_Success() {
-	handlerCalled := false
-	var receivedRecord *kgo.Record
-
-	handler := MessageHandlerFunc(func(ctx context.Context, record *kgo.Record) error {
-		handlerCalled = true
-		receivedRecord = record
-		return nil
-	})
-
-	c := &Consumer{
-		client:  s.mock,
-		handler: handler,
-		config:  &consumerConfig{},
-	}
-	c.ctx, c.cancel = context.WithCancel(context.Background())
-	c.logEmitter = log.NewNoop()
-	c.metricEmitter = metrics.NewNoop()
-
+// TestHandleOutcome tests offset commit logic based on different outcomes
+func (s *ConsumerTestSuite) TestHandleOutcome() {
 	record := &kgo.Record{
 		Topic:     "test-topic",
 		Partition: 0,
-		Offset:    123,
-		Value:     []byte("test-value"),
+		Offset:    100,
 	}
 
-	c.handleRecord(record)
+	tests := []struct {
+		name          string
+		outcome       wrpkafka.Outcome
+		err           error
+		expectCommit  bool
+		expectSuccess bool
+	}{
+		{
+			name:          "accepted outcome - commit and update success time",
+			outcome:       wrpkafka.Accepted,
+			err:           nil,
+			expectCommit:  true,
+			expectSuccess: true,
+		},
+		{
+			name:          "attempted outcome - commit",
+			outcome:       wrpkafka.Attempted,
+			err:           nil,
+			expectCommit:  true,
+			expectSuccess: false,
+		},
+		{
+			name:          "queued outcome - commit",
+			outcome:       wrpkafka.Queued,
+			err:           nil,
+			expectCommit:  true,
+			expectSuccess: false,
+		},
+		{
+			name:          "failed with non-retryable error - commit",
+			outcome:       wrpkafka.Failed,
+			err:           errors.New("permanent error"),
+			expectCommit:  true,
+			expectSuccess: false,
+		},
+		{
+			name:          "failed with timeout - no commit",
+			outcome:       wrpkafka.Failed,
+			err:           context.DeadlineExceeded,
+			expectCommit:  false,
+			expectSuccess: false,
+		},
+		{
+			name:          "failed with request timeout - no commit",
+			outcome:       wrpkafka.Failed,
+			err:           kerr.RequestTimedOut,
+			expectCommit:  false,
+			expectSuccess: false,
+		},
+		{
+			name:          "failed with buffer full - no commit",
+			outcome:       wrpkafka.Failed,
+			err:           kgo.ErrMaxBuffered,
+			expectCommit:  false,
+			expectSuccess: false,
+		},
+	}
 
-	s.True(handlerCalled)
-	s.Equal(record, receivedRecord)
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.mockClient = &MockClient{}
+			s.consumer.client = s.mockClient
+
+			// Record time before handling
+			timeBefore := s.consumer.timeSinceLastSuccess.Load()
+
+			// Sleep to ensure Unix second advances for success tests
+			if tt.expectSuccess {
+				time.Sleep(1100 * time.Millisecond)
+			}
+
+			if tt.expectCommit {
+				// MarkCommitRecords is variadic, so mock expects a slice
+				s.mockClient.On("MarkCommitRecords", mock.MatchedBy(func(records []*kgo.Record) bool {
+					return len(records) == 1 && records[0] == record
+				})).Return()
+			}
+
+			s.consumer.handleOutcome(tt.outcome, tt.err, record)
+
+			// Check if success time was updated
+			timeAfter := s.consumer.timeSinceLastSuccess.Load()
+			if tt.expectSuccess {
+				s.GreaterOrEqual(timeAfter, timeBefore+1, "success time should be updated by at least 1 second")
+			} else {
+				s.Equal(timeBefore, timeAfter, "success time should not be updated")
+			}
+
+			s.mockClient.AssertExpectations(s.T())
+		})
+	}
 }
 
-// TestConsumer_HandleRecord_Error tests message handling with errors
-func (s *ConsumerTestSuite) TestConsumer_HandleRecord_Error() {
-	testErr := errors.New("handler error")
-
-	handler := MessageHandlerFunc(func(ctx context.Context, record *kgo.Record) error {
-		return testErr
-	})
-
-	c := &Consumer{
-		client:  s.mock,
-		handler: handler,
-		config:  &consumerConfig{},
+// TestIsRetryable tests retry error classification
+func (s *ConsumerTestSuite) TestIsRetryable() {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "context deadline exceeded",
+			err:      context.DeadlineExceeded,
+			expected: true,
+		},
+		{
+			name:     "request timed out",
+			err:      kerr.RequestTimedOut,
+			expected: true,
+		},
+		{
+			name:     "max buffered",
+			err:      kgo.ErrMaxBuffered,
+			expected: true,
+		},
+		{
+			name:     "generic error",
+			err:      errors.New("some error"),
+			expected: false,
+		},
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
 	}
-	c.ctx, c.cancel = context.WithCancel(context.Background())
-	c.logEmitter = log.NewNoop()
-	c.metricEmitter = metrics.NewNoop()
 
-	record := &kgo.Record{
-		Topic: "test-topic",
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			result := isRetryable(tt.err)
+			s.Equal(tt.expected, result)
+		})
+	}
+}
+
+// TestManageFetchState tests pause/resume state management
+func (s *ConsumerTestSuite) TestManageFetchState() {
+	tests := []struct {
+		name             string
+		isPaused         bool
+		timeSinceSuccess int64
+		pauseThreshold   int64
+		unPauseAt        int64
+		expectPause      bool
+		expectResume     bool
+	}{
+		{
+			name:             "should pause when threshold exceeded",
+			isPaused:         false,
+			timeSinceSuccess: 120, // 2 minutes ago
+			pauseThreshold:   60,  // 1 minute threshold
+			expectPause:      true,
+			expectResume:     false,
+		},
+		{
+			name:             "should not pause when under threshold",
+			isPaused:         false,
+			timeSinceSuccess: 30, // 30 seconds ago
+			pauseThreshold:   60, // 1 minute threshold
+			expectPause:      false,
+			expectResume:     false,
+		},
+		{
+			name:             "should resume when timer expired",
+			isPaused:         true,
+			timeSinceSuccess: 120,
+			pauseThreshold:   60,
+			unPauseAt:        time.Now().Add(-5 * time.Second).Unix(), // Expired
+			expectPause:      false,
+			expectResume:     true,
+		},
+		{
+			name:             "should resume when recent success while paused",
+			isPaused:         true,
+			timeSinceSuccess: 30,                                      // Recent success
+			pauseThreshold:   60,                                      // Under threshold
+			unPauseAt:        time.Now().Add(30 * time.Second).Unix(), // Not expired
+			expectPause:      false,
+			expectResume:     true,
+		},
+		{
+			name:             "should stay paused when timer not expired",
+			isPaused:         true,
+			timeSinceSuccess: 120,
+			pauseThreshold:   60,
+			unPauseAt:        time.Now().Add(30 * time.Second).Unix(), // Future
+			expectPause:      false,
+			expectResume:     false,
+		},
 	}
 
-	// Should not panic even with handler error
-	s.NotPanics(func() {
-		c.handleRecord(record)
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.mockClient = &MockClient{}
+			s.consumer.client = s.mockClient
+
+			// Setup state
+			s.consumer.isPaused.Store(tt.isPaused)
+			s.consumer.timeSinceLastSuccess.Store(time.Now().Unix() - tt.timeSinceSuccess)
+			s.consumer.pauseThresholdSeconds = tt.pauseThreshold
+			s.consumer.unPauseAt.Store(tt.unPauseAt)
+
+			if tt.expectPause {
+				s.mockClient.On("PauseFetchTopics", s.consumer.config.topics).Return()
+			}
+			if tt.expectResume {
+				s.mockClient.On("ResumeFetchTopics", s.consumer.config.topics).Return()
+			}
+
+			s.consumer.wg.Add(1)
+			s.consumer.manageFetchState()
+
+			// Verify pause state
+			if tt.expectPause {
+				s.True(s.consumer.isPaused.Load(), "consumer should be paused")
+			}
+			if tt.expectResume {
+				s.False(s.consumer.isPaused.Load(), "consumer should be resumed")
+			}
+
+			s.mockClient.AssertExpectations(s.T())
+		})
+	}
+}
+
+// TestPauseFetchTopics tests the pause functionality
+func (s *ConsumerTestSuite) TestPauseFetchTopics() {
+	tests := []struct {
+		name          string
+		initialPaused bool
+		expectCall    bool
+	}{
+		{
+			name:          "pause when not paused",
+			initialPaused: false,
+			expectCall:    true,
+		},
+		{
+			name:          "no-op when already paused",
+			initialPaused: true,
+			expectCall:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.mockClient = &MockClient{}
+			s.consumer.client = s.mockClient
+			s.consumer.isPaused.Store(tt.initialPaused)
+			s.consumer.resumeDelaySeconds = 30
+
+			if tt.expectCall {
+				s.mockClient.On("PauseFetchTopics", s.consumer.config.topics).Return()
+			}
+
+			s.consumer.pauseFetchTopics()
+
+			if tt.expectCall {
+				s.True(s.consumer.isPaused.Load())
+				s.Greater(s.consumer.unPauseAt.Load(), int64(0))
+			}
+
+			s.mockClient.AssertExpectations(s.T())
+		})
+	}
+}
+
+// TestResumeFetchTopics tests the resume functionality
+func (s *ConsumerTestSuite) TestResumeFetchTopics() {
+	s.Run("resume topics", func() {
+		s.mockClient = &MockClient{}
+		s.consumer.client = s.mockClient
+		s.consumer.isPaused.Store(true)
+
+		s.mockClient.On("ResumeFetchTopics", s.consumer.config.topics).Return()
+
+		s.consumer.resumeFetchTopics()
+
+		s.False(s.consumer.isPaused.Load())
+		s.mockClient.AssertExpectations(s.T())
 	})
 }
 
-// TestConsumer_PollLoop_WithRecords tests the poll loop with records
-func (s *ConsumerTestSuite) TestConsumer_PollLoop_WithRecords() {
-	handlerCallCount := 0
-	var mu sync.Mutex
-
-	handler := MessageHandlerFunc(func(ctx context.Context, record *kgo.Record) error {
-		mu.Lock()
-		handlerCallCount++
-		mu.Unlock()
-		return nil
-	})
-
-	mock := newMockClient()
-
-	// Create a fetch with records
-	pollCount := 0
-	mock.pollFetchesFn = func(ctx context.Context) kgo.Fetches {
-		pollCount++
-		if pollCount == 1 {
-			// Return records on first poll
-			fetches := kgo.Fetches{}
-			fetches = append(fetches, kgo.Fetch{
-				Topics: []kgo.FetchTopic{
-					{
-						Topic: "test-topic",
-						Partitions: []kgo.FetchPartition{
-							{
-								Partition: 0,
-								Records: []*kgo.Record{
-									{Topic: "test-topic", Partition: 0, Offset: 1, Value: []byte("msg1")},
-									{Topic: "test-topic", Partition: 0, Offset: 2, Value: []byte("msg2")},
-								},
-							},
-						},
-					},
-				},
-			})
-			return fetches
-		}
-		// Return empty on subsequent polls to allow test to finish
-		return kgo.Fetches{}
+// TestHandlePublishEvent tests publish event handling
+func (s *ConsumerTestSuite) TestHandlePublishEvent() {
+	tests := []struct {
+		name          string
+		event         *wrpkafka.PublishEvent
+		expectSuccess bool
+	}{
+		{
+			name: "successful publish",
+			event: &wrpkafka.PublishEvent{
+				Topic: "test-topic",
+				Error: nil,
+			},
+			expectSuccess: true,
+		},
+		{
+			name: "failed publish",
+			event: &wrpkafka.PublishEvent{
+				Topic: "test-topic",
+				Error: errors.New("publish failed"),
+			},
+			expectSuccess: false,
+		},
 	}
 
-	c := &Consumer{
-		client:  mock,
-		handler: handler,
-		config:  &consumerConfig{},
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			timeBefore := s.consumer.timeSinceLastSuccess.Load()
+
+			// Sleep to ensure Unix second advances
+			time.Sleep(1100 * time.Millisecond)
+
+			s.consumer.HandlePublishEvent(tt.event)
+
+			timeAfter := s.consumer.timeSinceLastSuccess.Load()
+			if tt.expectSuccess {
+				s.GreaterOrEqual(timeAfter, timeBefore+1, "success time should be updated by at least 1 second")
+			} else {
+				s.Equal(timeBefore, timeAfter, "success time should not be updated")
+			}
+		})
 	}
-	c.ctx, c.cancel = context.WithCancel(context.Background())
-	c.logEmitter = log.NewNoop()
-	c.metricEmitter = metrics.NewNoop()
-
-	err := c.Start()
-	s.NoError(err)
-
-	// Give pollLoop time to process
-	time.Sleep(100 * time.Millisecond)
-
-	err = c.Stop(context.Background())
-	s.NoError(err)
-
-	// Should have processed 2 records
-	mu.Lock()
-	count := handlerCallCount
-	mu.Unlock()
-	s.Equal(2, count)
-	s.True(mock.getPollFetchesCallCount() > 0)
 }
 
-// TestConsumerTestSuite runs the test suite
-func TestConsumerTestSuite(t *testing.T) {
-	suite.Run(t, new(ConsumerTestSuite))
+// TestIsRunning tests the running state check
+func (s *ConsumerTestSuite) TestIsRunning() {
+	tests := []struct {
+		name     string
+		running  bool
+		expected bool
+	}{
+		{
+			name:     "consumer running",
+			running:  true,
+			expected: true,
+		},
+		{
+			name:     "consumer not running",
+			running:  false,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.consumer.running = tt.running
+			result := s.consumer.IsRunning()
+			s.Equal(tt.expected, result)
+		})
+	}
+}
+
+// TestPollLoop covers context done, no errors, and fetch error cases
+func (s *ConsumerTestSuite) TestPollLoop() {
+	tests := []struct {
+		name    string
+		setup   func(*MockClient, *MockFetches, *MockHandler)
+		ctxDone bool
+	}{
+		{
+			name:    "context done exits loop",
+			setup:   func(m *MockClient, mf *MockFetches, mh *MockHandler) {},
+			ctxDone: true,
+		},
+		{
+			name: "no errors, processes records",
+			setup: func(m *MockClient, mf *MockFetches, mh *MockHandler) {
+				m.On("MarkCommitRecords", mock.Anything).Return()
+				mf.On("Errors").Return([]*kgo.FetchError{})
+				m.On("PollFetches", mock.Anything).Return(mf)
+				mf.On("EachRecord", mock.Anything).Run(func(args mock.Arguments) {
+					fn := args.Get(0).(func(*kgo.Record))
+					rec1 := &kgo.Record{Topic: "test", Partition: 0, Offset: 0}
+					rec2 := &kgo.Record{Topic: "test", Partition: 0, Offset: 1}
+					mh.On("HandleMessage", mock.Anything, rec1).Return(wrpkafka.Accepted, nil).Once()
+					mh.On("HandleMessage", mock.Anything, rec2).Return(wrpkafka.Accepted, nil).Once()
+					fn(rec1)
+					fn(rec2)
+				})
+			},
+		},
+		{
+			name: "fetch error logs and emits metric",
+			setup: func(m *MockClient, mf *MockFetches, mh *MockHandler) {
+				mf.On("Errors").Return([]*kgo.FetchError{{Err: errors.New("fail"), Topic: "t", Partition: 1}})
+				mf.On("EachRecord", mock.Anything).Return()
+				m.On("PollFetches", mock.Anything).Return(mf)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+			s.consumer.ctx = ctx
+			s.consumer.cancel = cancel
+			s.mockClient = &MockClient{}
+			mf := &MockFetches{}
+			mh := &MockHandler{}
+			s.consumer.client = s.mockClient
+			s.consumer.handler = mh
+			if tt.setup != nil {
+				tt.setup(s.mockClient, mf, mh)
+			}
+			done := make(chan struct{})
+			s.consumer.wg.Add(1)
+			go func() {
+				s.consumer.pollLoop()
+				close(done)
+			}()
+			if tt.ctxDone {
+				cancel()
+			}
+			select {
+			case <-done:
+				// exited as expected
+			case <-time.After(1 * time.Second):
+				s.Fail("pollLoop did not exit in time")
+			}
+			s.mockClient.AssertExpectations(s.T())
+			mf.AssertExpectations(s.T())
+			mh.AssertExpectations(s.T())
+		})
+	}
 }

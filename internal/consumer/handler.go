@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/xmidt-org/wrpkafka"
 )
 
 // MessageHandler defines the interface for handling Kafka messages.
@@ -20,13 +21,13 @@ import (
 type MessageHandler interface {
 	// HandleMessage processes a single Kafka message.
 	// Returns nil on successful processing, or an error if processing fails.
-	HandleMessage(ctx context.Context, record *kgo.Record) error
+	HandleMessage(ctx context.Context, record *kgo.Record) (wrpkafka.Outcome, error)
 }
 
 // MessageHandlerFunc is a function adapter that implements MessageHandler.
-type MessageHandlerFunc func(ctx context.Context, record *kgo.Record) error
+type MessageHandlerFunc func(ctx context.Context, record *kgo.Record) (wrpkafka.Outcome, error)
 
 // HandleMessage implements the MessageHandler interface.
-func (f MessageHandlerFunc) HandleMessage(ctx context.Context, record *kgo.Record) error {
+func (f MessageHandlerFunc) HandleMessage(ctx context.Context, record *kgo.Record) (wrpkafka.Outcome, error) {
 	return f(ctx, record)
 }
