@@ -110,6 +110,16 @@ func (h *WRPMessageHandler) HandleMessage(ctx context.Context, record *kgo.Recor
 	})
 
 	if !h.buckets.IsInTargetBucket(&msg) {
+
+		// Record metrics for skipped message
+		h.metricEmitter.Notify(metrics.Event{
+			Name: metrics.PublisherOutcomes,
+			Labels: []string{
+				metrics.OutcomeLabel, "skipped",
+			},
+			Value: 1,
+		})
+
 		h.emitLog(log.LevelDebug, "message not in target bucket, skipping", map[string]any{
 			"source":      msg.Source,
 			"destination": msg.Destination,

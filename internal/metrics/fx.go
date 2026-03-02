@@ -31,19 +31,28 @@ type metricDefinition struct {
 
 // metrics
 const (
-	ConsumerFetchErrors  = "fetch_errors"
-	ConsumerCommitErrors = "commit_errors"
-	ConsumerPauses       = "fetch_pauses"
+	ConsumerFetchErrors    = "fetch_errors"
+	ConsumerCommitErrors   = "commit_errors"
+	ConsumerPauses         = "fetch_pauses"
+	PublisherOutcomes      = "publish_outcomes"
+	PublisherErrorsCounter = "publish_errors_total"
+
+	// Kafka publisher metrics (wrpkafka event listeners)
+	KafkaPublished         = "kafka_messages_published_total"
+	KafkaPublishLatency    = "kafka_publish_latency_seconds"
+	KafkaBufferUtilization = "kafka_buffer_utilization_percentage"
 )
 
 // labels
 const (
-	ErrorTypeLabel = "type"
-	TopicLabel     = "topic"
-	PartitionLabel = "partition"
-	GroupLabel     = "group"
-	MemberIdLabel  = "member"
-	ClientIdLabel  = "client"
+	ErrorTypeLabel          = "type"
+	TopicLabel              = "topic"
+	PartitionLabel          = "partition"
+	GroupLabel              = "group"
+	MemberIdLabel           = "member"
+	ClientIdLabel           = "client"
+	TopicShardStrategyLabel = "topic_shard_strategy"
+	OutcomeLabel            = "outcome"
 )
 
 // canned values
@@ -70,6 +79,18 @@ var fxMetrics = []metricDefinition{
 		Name:   ConsumerPauses,
 		Help:   "Current pause state (1=paused, 0=running)",
 		Labels: ClientIdLabel,
+	},
+	{
+		Type:   COUNTER,
+		Name:   PublisherOutcomes,
+		Help:   "Number of successful message publications",
+		Labels: fmt.Sprintf("%s,%s, %s", TopicLabel, TopicShardStrategyLabel, OutcomeLabel),
+	},
+	{
+		Type:   COUNTER,
+		Name:   PublisherErrorsCounter,
+		Help:   "Total number of publish errors",
+		Labels: fmt.Sprintf("%s,%s,%s", ErrorTypeLabel, TopicLabel, TopicShardStrategyLabel),
 	},
 }
 
