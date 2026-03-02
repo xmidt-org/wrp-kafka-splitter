@@ -17,11 +17,11 @@ import (
 )
 
 const (
-	inputTopic    = "wrp-events"     // Topic the service consumes from
-	defaultOutputTopic = "default-events" // Default topic for general events
-	deviceStatusOutputTopic  = "device-status-events" // Topic for device status events
-	timeoutShort       = 5 * time.Second         // Short timeout for basic operations
-	timeoutMedium      = 10 * time.Second        // Medium timeout for processing
+	inputTopic              = "wrp-events"           // Topic the service consumes from
+	defaultOutputTopic      = "default-events"       // Default topic for general events
+	deviceStatusOutputTopic = "device-status-events" // Topic for device status events
+	timeoutShort            = 5 * time.Second        // Short timeout for basic operations
+	timeoutMedium           = 10 * time.Second       // Medium timeout for processing
 )
 
 // SplitterTestSuite is a test suite for integration testing of wrp-kafka-splitter.
