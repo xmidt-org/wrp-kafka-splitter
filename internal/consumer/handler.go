@@ -30,6 +30,24 @@ const (
 	UnknownOutcome
 )
 
+// String returns the string representation of the Outcome.
+func (o Outcome) String() string {
+	switch o {
+	case Accepted:
+		return "Accepted"
+	case Queued:
+		return "Queued"
+	case Attempted:
+		return "Attempted"
+	case Skipped:
+		return "Skipped"
+	case Failed:
+		return "Failed"
+	default:
+		return "Unknown"
+	}
+}
+
 var (
 	ErrMalformedMsg = errors.New("malformed wrp message")
 )
@@ -110,16 +128,6 @@ func (h *WRPMessageHandler) HandleMessage(ctx context.Context, record *kgo.Recor
 	})
 
 	if !h.buckets.IsInTargetBucket(&msg) {
-
-		// Record metrics for skipped message
-		h.metricEmitter.Notify(metrics.Event{
-			Name: metrics.PublisherOutcomes,
-			Labels: []string{
-				metrics.OutcomeLabel, "skipped",
-			},
-			Value: 1,
-		})
-
 		h.emitLog(log.LevelDebug, "message not in target bucket, skipping", map[string]any{
 			"source":      msg.Source,
 			"destination": msg.Destination,
