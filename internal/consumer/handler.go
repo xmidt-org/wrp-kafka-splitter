@@ -106,6 +106,7 @@ func (h *WRPMessageHandler) HandleMessage(ctx context.Context, record *kgo.Recor
 		"msg_type":         msg.Type.String(),
 		"source":           msg.Source,
 		"destination":      msg.Destination,
+		"metadata":         msg.Metadata,
 		"transaction_uuid": msg.TransactionUUID,
 	})
 
