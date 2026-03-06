@@ -442,9 +442,9 @@ func (suite *PublisherTestSuite) TestEventEmission() {
 			if tt.expectMetrics > 0 {
 				// Verify error metric contains expected information
 				errorMetric := metricEvents[0]
-				suite.Equal("publisher_errors", errorMetric.Name)
+				suite.Equal("publish_errors_total", errorMetric.Name)
 				suite.Equal(float64(1), errorMetric.Value)
-				suite.Contains(errorMetric.Labels, "error_type")
+				suite.Contains(errorMetric.Labels, "type")
 				suite.Contains(errorMetric.Labels, "not_started")
 			}
 		})
@@ -543,7 +543,7 @@ func (suite *PublisherTestSuite) TestProduceMessageTypes() {
 			time.Sleep(10 * time.Millisecond)
 			metricEvents := suite.getMetricEvents()
 			suite.Len(metricEvents, 1)
-			suite.Equal("publisher_errors", metricEvents[0].Name)
+			suite.Equal("publish_errors_total", metricEvents[0].Name)
 		})
 	}
 }

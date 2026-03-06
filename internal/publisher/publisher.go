@@ -99,6 +99,55 @@ func (p *KafkaPublisher) Start() error {
 		return ErrPublisherAlreadyStarted
 	}
 
+	// Add event listener for all publish events (success and failure)
+	p.wrpPublisher.AddPublishEventListener(func(event *wrpkafka.PublishEvent) {
+
+		errorType := "success"
+		if event.Error != nil {
+			errorType = event.ErrorType
+		}
+
+		labels := []string{
+			metrics.TopicLabel, event.Topic,
+			metrics.TopicShardStrategyLabel, event.TopicShardStrategy,
+			metrics.ErrorTypeLabel, errorType,
+		}
+
+		p.metricEmitter.Notify(metrics.Event{
+			Name:   metrics.KafkaPublished,
+			Value:  1,
+			Labels: labels,
+		})
+
+		// Record latency for all events
+		p.metricEmitter.Notify(metrics.Event{
+			Name:  metrics.KafkaPublishLatency,
+			Value: event.Duration.Seconds(),
+			Labels: []string{
+				metrics.TopicLabel, event.Topic,
+				metrics.ErrorTypeLabel, func() string {
+					if event.Error != nil {
+						return event.ErrorType
+					}
+					return "none"
+				}(),
+			},
+		})
+
+	})
+
+	// Set up buffer utilization gauge (only if MaxBufferedRecords is configured)
+	if p.config.maxBufferedRecords > 0 {
+		p.metricEmitter.Notify(metrics.Event{
+			Name:  metrics.KafkaBufferUtilization,
+			Value: 0, // Initial value
+			Labels: []string{
+				metrics.TopicLabel, "all",
+			},
+		})
+	}
+
+	// Start the wrpkafka publisher
 	if err := p.wrpPublisher.Start(); err != nil {
 		p.logEmitter.Notify(log.NewEvent(log.LevelError, "Failed to start WRP publisher", map[string]any{
 			"error": err.Error(),
@@ -143,10 +192,10 @@ func (p *KafkaPublisher) Produce(ctx context.Context, msg *wrp.Message) (wrpkafk
 
 	if !started {
 		p.metricEmitter.Notify(metrics.Event{
-			Name:  "publisher_errors",
+			Name:  metrics.PublisherErrorsCounter,
 			Value: 1,
 			Labels: []string{
-				"error_type", "not_started",
+				metrics.ErrorTypeLabel, "not_started",
 			},
 		})
 		return 0, ErrPublisherNotStarted // Return 0 (which corresponds to wrpkafka.Accepted) as default
@@ -162,6 +211,14 @@ func (p *KafkaPublisher) Produce(ctx context.Context, msg *wrp.Message) (wrpkafk
 		}))
 		return outcome, fmt.Errorf("failed to produce message: %w", err)
 	}
+
+	p.metricEmitter.Notify(metrics.Event{
+		Name:  metrics.PublisherOutcomes,
+		Value: 1,
+		Labels: []string{
+			metrics.OutcomeLabel, outcome.String(),
+		},
+	})
 
 	p.logEmitter.Notify(log.NewEvent(log.LevelDebug, "WRP message produced successfully", map[string]any{
 		"message_type": msg.Type.String(),

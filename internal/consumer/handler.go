@@ -30,6 +30,24 @@ const (
 	UnknownOutcome
 )
 
+// String returns the string representation of the Outcome.
+func (o Outcome) String() string {
+	switch o {
+	case Accepted:
+		return "Accepted"
+	case Queued:
+		return "Queued"
+	case Attempted:
+		return "Attempted"
+	case Skipped:
+		return "Skipped"
+	case Failed:
+		return "Failed"
+	default:
+		return "Unknown"
+	}
+}
+
 var (
 	ErrMalformedMsg = errors.New("malformed wrp message")
 )

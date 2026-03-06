@@ -31,19 +31,28 @@ type metricDefinition struct {
 
 // metrics
 const (
-	ConsumerFetchErrors  = "fetch_errors"
-	ConsumerCommitErrors = "commit_errors"
-	ConsumerPauses       = "fetch_pauses"
+	ConsumerFetchErrors    = "fetch_errors"
+	ConsumerCommitErrors   = "commit_errors"
+	ConsumerPauses         = "fetch_pauses"
+	PublisherOutcomes      = "publish_outcomes"
+	PublisherErrorsCounter = "publish_errors_total"
+
+	// Kafka publisher metrics (wrpkafka event listeners)
+	KafkaPublished         = "kafka_messages_published_total"
+	KafkaPublishLatency    = "kafka_publish_latency_seconds"
+	KafkaBufferUtilization = "kafka_buffer_utilization_percentage"
 )
 
 // labels
 const (
-	ErrorTypeLabel = "type"
-	TopicLabel     = "topic"
-	PartitionLabel = "partition"
-	GroupLabel     = "group"
-	MemberIdLabel  = "member"
-	ClientIdLabel  = "client"
+	ErrorTypeLabel          = "type"
+	TopicLabel              = "topic"
+	PartitionLabel          = "partition"
+	GroupLabel              = "group"
+	MemberIdLabel           = "member"
+	ClientIdLabel           = "client"
+	TopicShardStrategyLabel = "topic_shard_strategy"
+	OutcomeLabel            = "outcome"
 )
 
 // canned values
@@ -70,6 +79,37 @@ var fxMetrics = []metricDefinition{
 		Name:   ConsumerPauses,
 		Help:   "Current pause state (1=paused, 0=running)",
 		Labels: fmt.Sprintf("%s,%s", GroupLabel, ClientIdLabel),
+	},
+	{
+		Type:   COUNTER,
+		Name:   PublisherOutcomes,
+		Help:   "Number of successful message publications",
+		Labels: fmt.Sprintf("%s,%s, %s", TopicLabel, TopicShardStrategyLabel, OutcomeLabel),
+	},
+	{
+		Type:   COUNTER,
+		Name:   PublisherErrorsCounter,
+		Help:   "Total number of publish errors",
+		Labels: fmt.Sprintf("%s,%s,%s", ErrorTypeLabel, TopicLabel, TopicShardStrategyLabel),
+	},
+	{
+		Type:   COUNTER,
+		Name:   KafkaPublished,
+		Help:   "Total number of messages published to Kafka (including failures)",
+		Labels: fmt.Sprintf("%s,%s,%s", TopicLabel, TopicShardStrategyLabel, ErrorTypeLabel),
+	},
+	{
+		Type:    HISTOGRAM,
+		Name:    KafkaPublishLatency,
+		Help:    "Latency of publishing messages to Kafka",
+		Labels:  fmt.Sprintf("%s,%s", TopicLabel, ErrorTypeLabel),
+		Buckets: "0.005,0.01,0.025,0.05,0.1,0.25,0.5,1,2.5,5,10",
+	},
+	{
+		Type:   GAUGE,
+		Name:   KafkaBufferUtilization,
+		Help:   "Percentage of Kafka producer buffer utilization",
+		Labels: TopicLabel,
 	},
 }
 

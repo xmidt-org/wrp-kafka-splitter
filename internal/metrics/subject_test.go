@@ -124,5 +124,5 @@ func (s *SubjectTestSuite) TestCreateObservers() {
 	observers := createObservers(metrics)
 
 	s.NotNil(observers)
-	s.Len(observers, 3)
+	s.Len(observers, 8)
 }

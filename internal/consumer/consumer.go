@@ -272,6 +272,14 @@ func (c *KafkaConsumer) pollLoop() {
 				})
 			}
 			c.handleOutcome(outcome, err, record)
+
+			c.metricEmitter.Notify(metrics.Event{
+				Name:  metrics.PublisherOutcomes,
+				Value: 1,
+				Labels: []string{
+					metrics.OutcomeLabel, outcome.String(),
+				},
+			})
 		})
 	}
 }
