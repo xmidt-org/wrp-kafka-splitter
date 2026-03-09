@@ -73,14 +73,14 @@ func (s *BucketsSuite) TestNewBuckets_NoBuckets() {
 func (s *BucketsSuite) TestNoBuckets() {
 	buckets, err := NewBuckets(Config{})
 	assert.NoError(s.T(), err)
-	msg := &wrp.Message{Metadata: map[string]string{"hw-deviceid": "mac:112233445566"}}
+	msg := &wrp.Message{Metadata: map[string]string{DeviceIdMetadataKeyName: "mac:112233445566"}}
 	inBucket, err := buckets.IsInTargetBucket(msg)
 	assert.NoError(s.T(), err)
 	assert.True(s.T(), inBucket)
 }
 
 func (s *BucketsSuite) TestIsInBucket_True() {
-	msg := &wrp.Message{Metadata: map[string]string{"hw-deviceid": "mac:112233445566"}}
+	msg := &wrp.Message{Metadata: map[string]string{DeviceIdMetadataKeyName: "mac:112233445566"}}
 	partitionKey, _ := s.buckets.getPartitionKey(msg)
 	partitioner := NewPartitioner()
 	bucket, _ := partitioner.Partition(partitionKey, s.buckets.thresholds)
@@ -92,14 +92,14 @@ func (s *BucketsSuite) TestIsInBucket_True() {
 
 // this specific mac is in bucket B
 func (s *BucketsSuite) TestIsInBucketHardcodedValue_True() {
-	msg := &wrp.Message{Metadata: map[string]string{"hw-deviceid": "mac:999999999999"}}
+	msg := &wrp.Message{Metadata: map[string]string{DeviceIdMetadataKeyName: "mac:999999999999"}}
 	inBucket, err := s.buckets.IsInTargetBucket(msg)
 	assert.NoError(s.T(), err)
 	assert.True(s.T(), inBucket)
 }
 
 func (s *BucketsSuite) TestIsInBucket_False() {
-	msg := &wrp.Message{Metadata: map[string]string{"hw-deviceid": "mac:112233445566"}}
+	msg := &wrp.Message{Metadata: map[string]string{DeviceIdMetadataKeyName: "mac:112233445566"}}
 	partitionKey, _ := s.buckets.getPartitionKey(msg)
 	partitioner := NewPartitioner()
 	bucket, _ := partitioner.Partition(partitionKey, s.buckets.thresholds)
@@ -122,7 +122,7 @@ func (s *BucketsSuite) TestIsInBucketHardcodedValue_False() {
 	buckets, err := NewBuckets(cfg)
 
 	s.NoError(err)
-	msg := &wrp.Message{Metadata: map[string]string{"hw-deviceid": "mac:999999999999"}}
+	msg := &wrp.Message{Metadata: map[string]string{DeviceIdMetadataKeyName: "mac:999999999999"}}
 	inBucket, err := buckets.IsInTargetBucket(msg)
 	assert.NoError(s.T(), err)
 	assert.False(s.T(), inBucket)
@@ -149,7 +149,7 @@ func (s *BucketsSuite) TestIsInBucket_NoPartitionKey_Drop() {
 	buckets, err := NewBuckets(cfg)
 	s.NoError(err)
 
-	msg := &wrp.Message{Metadata: map[string]string{"hw-deviceid": ""}}
+	msg := &wrp.Message{Metadata: map[string]string{DeviceIdMetadataKeyName: ""}}
 	inBucket, err := buckets.IsInTargetBucket(msg)
 	assert.Error(s.T(), err)
 	assert.False(s.T(), inBucket)
@@ -158,7 +158,7 @@ func (s *BucketsSuite) TestIsInBucket_NoPartitionKey_Drop() {
 func (s *BucketsSuite) TestGetPartitionKey_InvalidKeyType() {
 	b := s.buckets
 	b.partitionKeyType = -1
-	msg := &wrp.Message{Metadata: map[string]string{"hw-deviceid": "mac:112233445566"}}
+	msg := &wrp.Message{Metadata: map[string]string{DeviceIdMetadataKeyName: "mac:112233445566"}}
 	_, err := b.getPartitionKey(msg)
 	assert.Error(s.T(), err)
 }
