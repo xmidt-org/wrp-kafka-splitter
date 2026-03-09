@@ -190,7 +190,7 @@ func Provide() fx.Option {
 		}
 
 		if m.GaugeFunc != nil {
-			// Create a GaugeFunc that calls getKafkaBufferUtilization
+			// Create a GaugeFunc that calls the provided function
 			opt = fx.Provide(fx.Annotated{
 				Name: m.Name,
 				Target: func(f *touchstone.Factory) (prometheus.GaugeFunc, error) {
@@ -199,7 +199,7 @@ func Provide() fx.Option {
 							Name: m.Name,
 							Help: m.Help,
 						},
-						getKafkaBufferUtilization,
+						m.GaugeFunc,
 					)
 				},
 			})
