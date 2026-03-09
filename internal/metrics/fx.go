@@ -17,18 +17,18 @@ import (
 type metricType int
 
 const (
-	COUNTER    metricType = 1
-	GAUGE      metricType = 2
-	HISTOGRAM  metricType = 3
-	GAUGE_FUNC metricType = 4
+	COUNTER   metricType = 1
+	GAUGE     metricType = 2
+	HISTOGRAM metricType = 3
 )
 
 type metricDefinition struct {
-	Type    metricType
-	Name    string // the metric name (prometheus.CounterOpts.Name, etc)
-	Help    string // the metric help (prometheus.CounterOpts.Help, etc)
-	Labels  string // a comma separated list of labels that are whitespace trimmed
-	Buckets string // a comma separated list of labels that are whitespace trimmed
+	Type      metricType
+	Name      string         // the metric name (prometheus.CounterOpts.Name, etc)
+	Help      string         // the metric help (prometheus.CounterOpts.Help, etc)
+	Labels    string         // a comma separated list of labels that are whitespace trimmed
+	Buckets   string         // a comma separated list of labels that are whitespace trimmed
+	GaugeFunc func() float64 // optional function for GaugeFunc metrics
 }
 
 // metrics
@@ -108,10 +108,11 @@ var fxMetrics = []metricDefinition{
 		Buckets: "0.005,0.01,0.025,0.05,0.1,0.25,0.5,1,2.5,5,10",
 	},
 	{
-		Type:   GAUGE_FUNC,
-		Name:   KafkaBufferUtilization,
-		Help:   "Percentage of Kafka producer buffer utilization",
-		Labels: TopicLabel,
+		Type:      GAUGE,
+		Name:      KafkaBufferUtilization,
+		Help:      "Percentage of Kafka producer buffer utilization",
+		Labels:    TopicLabel,
+		GaugeFunc: getKafkaBufferUtilization,
 	},
 }
 
@@ -163,21 +164,6 @@ func Provide() fx.Option {
 				},
 				labels...)
 
-		case GAUGE_FUNC:
-			// Create a GaugeFunc that calls getKafkaBufferUtilization
-			opt = fx.Provide(fx.Annotated{
-				Name: m.Name,
-				Target: func(f *touchstone.Factory) (prometheus.GaugeFunc, error) {
-					return f.NewGaugeFunc(
-						prometheus.GaugeOpts{
-							Name: m.Name,
-							Help: m.Help,
-						},
-						getKafkaBufferUtilization,
-					)
-				},
-			})
-
 		case HISTOGRAM:
 			buckets := strings.Split(m.Buckets, ",")
 			bucketLimits := make([]float64, len(buckets))
@@ -201,6 +187,22 @@ func Provide() fx.Option {
 
 		if opt == nil {
 			panic(fmt.Sprintf("failed to create metric '%s'", m.Name))
+		}
+
+		if m.GaugeFunc != nil {
+			// Create a GaugeFunc that calls getKafkaBufferUtilization
+			opt = fx.Provide(fx.Annotated{
+				Name: m.Name,
+				Target: func(f *touchstone.Factory) (prometheus.GaugeFunc, error) {
+					return f.NewGaugeFunc(
+						prometheus.GaugeOpts{
+							Name: m.Name,
+							Help: m.Help,
+						},
+						getKafkaBufferUtilization,
+					)
+				},
+			})
 		}
 
 		opts = append(opts, opt)

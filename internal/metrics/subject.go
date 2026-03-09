@@ -17,8 +17,9 @@ type Metrics struct {
 	PublisherErrorsCounter kit.Counter
 
 	// Kafka publisher metrics (wrpkafka event listeners)
-	KafkaPublished      kit.Counter
-	KafkaPublishLatency kit.Histogram
+	KafkaPublished         kit.Counter
+	KafkaPublishLatency    kit.Histogram
+	KafkaBufferUtilization kit.Gauge
 }
 
 type Metric struct {
@@ -49,6 +50,7 @@ func createObservers(m Metrics) []*Observer {
 		NewObserver(PublisherErrorsCounter, COUNTER, Metric{counter: m.PublisherErrorsCounter}),
 		NewObserver(KafkaPublished, COUNTER, Metric{counter: m.KafkaPublished}),
 		NewObserver(KafkaPublishLatency, HISTOGRAM, Metric{histogram: m.KafkaPublishLatency}),
+		NewObserver(KafkaBufferUtilization, GAUGE, Metric{gauge: m.KafkaBufferUtilization}),
 	}
 	return observers
 }
