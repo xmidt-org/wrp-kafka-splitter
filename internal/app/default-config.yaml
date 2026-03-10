@@ -47,7 +47,7 @@ buckets:
 
   # Required: Target bucket name to route messages to
   target_bucket: "bucket-0"
-  partition_key_type: "device_id"
+  partition_key_type: "metadata/hw-deviceid" # "metadata/<key>", "source", "none" 
   missing_partition_key_action: "include" # "include" (default), "drop"
 
 producer:
