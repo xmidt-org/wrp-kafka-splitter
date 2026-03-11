@@ -61,7 +61,7 @@ type Buckets struct {
 	targetBucketIndex         int
 	partitioner               Partitioner
 	missingPartitionKeyAction MissingPartitionKeyAction
-	partitionKeyType          HashKeyType
+	hashKey                   HashKey
 	metatadataKeyField        string
 	buckets                   []BucketSettings
 	thresholds                []float32
@@ -94,7 +94,7 @@ func NewBuckets(config Config) (Bucket, error) {
 	}
 
 	// set the bucket key type
-	partitionKeyType, metadataKeyField, err := ParseHashKeyType(config.PartitionKeyType)
+	hashKey, err := ParseHashKey(config.PartitionKeyType)
 	if err != nil {
 		return &Buckets{}, err
 	}
@@ -113,8 +113,7 @@ func NewBuckets(config Config) (Bucket, error) {
 		targetBucketIndex:         targetBucketIndex,
 		buckets:                   config.PossibleBuckets,
 		thresholds:                thresholds,
-		partitionKeyType:          partitionKeyType,
-		metatadataKeyField:        metadataKeyField,
+		hashKey:                   hashKey,
 		missingPartitionKeyAction: missingPartitionKeyAction}, nil
 }
 
@@ -151,7 +150,7 @@ func (r *Buckets) IsInTargetBucket(msg *wrp.Message) (bool, error) {
 }
 
 func (r *Buckets) getPartitionKey(msg *wrp.Message) (string, error) {
-	return GetHashKey(msg, r.partitionKeyType, r.metatadataKeyField)
+	return r.hashKey.GetHashKey(msg)
 }
 
 func getMissingPartitionKeyAction(action string) (MissingPartitionKeyAction, error) {
