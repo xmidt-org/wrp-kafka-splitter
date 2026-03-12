@@ -62,7 +62,6 @@ producer:
         - "localhost:9092"
       us-west-2:
         - "localhost:9092"
-      
 # Kafka Consumer Configuration
 consumer:
   # Required: List of Kafka broker addresses
