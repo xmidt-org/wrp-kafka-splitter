@@ -699,7 +699,7 @@ func (suite *PublisherTestSuite) TestPublisherValidation() {
 				WithTopicRoutes(wrpkafka.TopicRoute{Topic: "test", Pattern: ".*"}),
 			},
 			expectError: true,
-			errorCheck:  func(err error) bool { return err.Error() == "regions map cannot be empty" },
+			errorCheck:  func(err error) bool { return err.Error() == "brokers cannot be empty" },
 			description: "Should reject empty broker regions",
 		},
 		{
