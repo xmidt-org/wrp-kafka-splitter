@@ -31,14 +31,13 @@ func TestOptionsTestSuite(t *testing.T) {
 // Helper to create a basic consumer for testing
 func (s *OptionsTestSuite) createTestConsumer(opts ...Option) (*KafkaConsumer, error) {
 	// Start with required options
-	baseOpts := []Option{
-		WithBrokers("localhost:9092"),
-		WithTopics("test-topic"),
-		WithGroupID("test-group"),
-		WithMessageHandler(MessageHandlerFunc(func(ctx context.Context, record *kgo.Record) (Outcome, error) {
-			return Attempted, nil
-		})),
-	}
+	baseOpts := make([]Option, 4, 4+len(opts))
+	baseOpts[0] = WithBrokers("localhost:9092")
+	baseOpts[1] = WithTopics("test-topic")
+	baseOpts[2] = WithGroupID("test-group")
+	baseOpts[3] = WithMessageHandler(MessageHandlerFunc(func(ctx context.Context, record *kgo.Record) (Outcome, error) {
+		return Attempted, nil
+	}))
 
 	allOpts := append(baseOpts, opts...)
 	consumer, err := New(allOpts...)

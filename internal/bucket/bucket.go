@@ -62,7 +62,6 @@ type Buckets struct {
 	partitioner               Partitioner
 	missingPartitionKeyAction MissingPartitionKeyAction
 	hashKey                   HashKey
-	metatadataKeyField        string
 	buckets                   []BucketSettings
 	thresholds                []float32
 }

@@ -34,6 +34,7 @@ func (s *ConsumerTestSuite) SetupTest() {
 	s.mockClient = &MockClient{}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	s.consumer = &KafkaConsumer{
 		client:  s.mockClient,
@@ -57,6 +58,7 @@ func GetConsumer() *KafkaConsumer {
 	mockClient := &MockClient{}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	consumer := &KafkaConsumer{
 		client:  mockClient,
