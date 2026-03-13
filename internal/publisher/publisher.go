@@ -99,10 +99,9 @@ func (p *KafkaPublisher) Start() error {
 		return ErrPublisherAlreadyStarted
 	}
 
-	// log the target broker and bucket at startup for visibility
-	p.logEmitter.Notify(log.NewEvent(log.LevelInfo, "Starting WRP publisher with configured target broker and target bucket", map[string]any{
-		"brokers":       p.config.brokers.TargetRegion,
-		"target_bucket": p.config.bucketConfig.TargetBucket,
+	// log the target broker at startup for visibility
+	p.logEmitter.Notify(log.NewEvent(log.LevelInfo, "Starting WRP publisher with configured target broker", map[string]any{
+		"brokers": p.config.brokers.TargetRegion,
 	}))
 
 	// Add event listener for all publish events (success and failure)

@@ -6,7 +6,6 @@ package app
 import (
 	"fmt"
 
-	"xmidt-org/splitter/internal/bucket"
 	"xmidt-org/splitter/internal/log"
 	"xmidt-org/splitter/internal/metrics"
 	"xmidt-org/splitter/internal/observe"
@@ -19,7 +18,6 @@ import (
 type PublisherIn struct {
 	fx.In
 	Config        publisher.Config
-	BucketConfig  bucket.Config
 	LogEmitter    *observe.Subject[log.Event]
 	MetricEmitter *observe.Subject[metrics.Event]
 }
@@ -46,7 +44,6 @@ func providePublisher(in PublisherIn) (PublisherOut, error) {
 		// Required options
 		publisher.WithBrokers(cfg.Brokers),
 		publisher.WithTopicRoutes(wrpRoutes...),
-		publisher.WithBucketConfig(in.BucketConfig),
 
 		// Optional configurations
 		publisher.WithMaxBufferedRecords(cfg.MaxBufferedRecords),

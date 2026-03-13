@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"os"
 	"time"
-	"xmidt-org/splitter/internal/bucket"
 	"xmidt-org/splitter/internal/log"
 	"xmidt-org/splitter/internal/metrics"
 	"xmidt-org/splitter/internal/observe"
@@ -44,9 +43,8 @@ func (f optionFunc) apply(p *KafkaPublisher) error {
 // publisherConfig holds the configuration for a Publisher.
 type publisherConfig struct {
 	// Required options
-	brokers      Brokers
-	topicRoutes  []wrpkafka.TopicRoute
-	bucketConfig bucket.Config
+	brokers     Brokers
+	topicRoutes []wrpkafka.TopicRoute
 
 	// Optional publisher config fields (applied directly to wrpkafka.Publisher)
 	sasl                   sasl.Mechanism
@@ -98,14 +96,6 @@ func WithBrokers(brokers Brokers) Option {
 func WithTopicRoutes(routes ...wrpkafka.TopicRoute) Option {
 	return optionFunc(func(p *KafkaPublisher) error {
 		p.config.topicRoutes = routes
-		return nil
-	})
-}
-
-// WithBucketConfig sets the bucket configuration.
-func WithBucketConfig(bucketConfig bucket.Config) Option {
-	return optionFunc(func(p *KafkaPublisher) error {
-		p.config.bucketConfig = bucketConfig
 		return nil
 	})
 }
