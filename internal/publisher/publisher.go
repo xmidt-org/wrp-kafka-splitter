@@ -202,7 +202,7 @@ func (p *KafkaPublisher) Produce(ctx context.Context, msg *wrp.Message) (wrpkafk
 				metrics.ErrorTypeLabel, "not_started",
 			},
 		})
-		return 0, ErrPublisherNotStarted // Return 0 (which corresponds to wrpkafka.Accepted) as default
+		return 0, ErrPublisherNotStarted // Return 0 (which corresponds to wrpkafka.Attempted) as default
 	}
 
 	outcome, err := p.wrpPublisher.Produce(ctx, msg)
@@ -213,6 +213,13 @@ func (p *KafkaPublisher) Produce(ctx context.Context, msg *wrp.Message) (wrpkafk
 			"source":       msg.Source,
 			"destination":  msg.Destination,
 		}))
+		p.metricEmitter.Notify(metrics.Event{
+			Name:  metrics.PublisherErrorsCounter,
+			Value: 1,
+			Labels: []string{
+				metrics.ErrorTypeLabel, "failed_to_produce_message",
+			},
+		})
 		return outcome, fmt.Errorf("failed to produce message: %w", err)
 	}
 

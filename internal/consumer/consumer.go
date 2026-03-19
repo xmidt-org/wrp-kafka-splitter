@@ -271,7 +271,6 @@ func (c *KafkaConsumer) pollLoop() {
 					"offset":    record.Offset,
 				})
 			}
-			c.handleOutcome(outcome, err, record)
 
 			c.metricEmitter.Notify(metrics.Event{
 				Name:  metrics.PublisherOutcomes,
@@ -280,6 +279,8 @@ func (c *KafkaConsumer) pollLoop() {
 					metrics.OutcomeLabel, outcome.String(),
 				},
 			})
+
+			c.handleOutcome(outcome, err, record)
 		})
 	}
 }
