@@ -55,13 +55,13 @@ func (suite *PublisherTestSuite) SetupTest() {
 }
 
 // Helper methods for thread-safe event access
-func (suite *PublisherTestSuite) getLogEvents() []log.Event {
-	suite.eventMutex.Lock()
-	defer suite.eventMutex.Unlock()
-	events := make([]log.Event, len(suite.logEvents))
-	copy(events, suite.logEvents)
-	return events
-}
+// func (suite *PublisherTestSuite) getLogEvents() []log.Event {
+// 	suite.eventMutex.Lock()
+// 	defer suite.eventMutex.Unlock()
+// 	events := make([]log.Event, len(suite.logEvents))
+// 	copy(events, suite.logEvents)
+// 	return events
+// }
 
 func (suite *PublisherTestSuite) getMetricEvents() []metrics.Event {
 	suite.eventMutex.Lock()
