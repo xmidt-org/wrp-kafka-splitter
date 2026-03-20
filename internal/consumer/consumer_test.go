@@ -769,3 +769,321 @@ func (s *ConsumerTestSuite) TestPollLoop() {
 		})
 	}
 }
+
+// TestPollLoopPanic tests panic recovery in the poll loop
+func (s *ConsumerTestSuite) TestPollLoopPanic() {
+	tests := []struct {
+		name          string
+		setup         func(*MockClient, *MockFetches)
+		expectedState bool // expected value of running after panic
+	}{
+		{
+			name: "panic in poll loop sets running to false",
+			setup: func(m *MockClient, mf *MockFetches) {
+				// First call returns normally, second call panics
+				m.On("PollFetches", mock.Anything).Return(mf).Once().Run(func(args mock.Arguments) {
+					// Return normally first time
+				})
+				m.On("PollFetches", mock.Anything).Run(func(args mock.Arguments) {
+					panic("simulated poll loop panic")
+				})
+				mf.On("Errors").Return([]*kgo.FetchError{})
+				mf.On("EachRecord", mock.Anything).Return()
+			},
+			expectedState: false, // running should be false after panic
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			// Create a fresh consumer for each test
+			consumer := GetConsumer()
+			ctx, cancel := context.WithCancel(context.Background())
+			consumer.ctx = ctx
+			consumer.cancel = cancel
+			consumer.running = true // Set to running initially
+
+			mockClient := &MockClient{}
+			mf := &MockFetches{}
+			consumer.client = mockClient
+
+			if tt.setup != nil {
+				tt.setup(mockClient, mf)
+			}
+
+			done := make(chan struct{})
+			consumer.wg.Add(1)
+			go func() {
+				consumer.pollLoop()
+				close(done)
+			}()
+
+			// Wait for the goroutine to exit (should recover from panic)
+			select {
+			case <-done:
+				// Goroutine exited (recovered from panic)
+			case <-time.After(2 * time.Second):
+				s.Fail("pollLoop did not exit in time after panic")
+			}
+
+			// Verify that running was set to false after panic
+			s.Equal(tt.expectedState, consumer.IsRunning(), "running state should be false after panic recovery")
+
+			cancel()
+			consumer.wg.Wait()
+		})
+	}
+}
+
+// TestMessageProcessingPanic tests panic recovery during individual message processing
+func (s *ConsumerTestSuite) TestMessageProcessingPanic() {
+	tests := []struct {
+		name                string
+		setup               func(*MockClient, *MockFetches, *MockHandler)
+		expectContinue      bool // expect poll loop to continue after message panic
+		commitCalledForRec1 bool // expect commit to be called for record 1
+		commitCalledForRec2 bool // expect commit to be called for record 2
+	}{
+		{
+			name: "panic in message handler does not stop poll loop",
+			setup: func(m *MockClient, mf *MockFetches, mh *MockHandler) {
+				m.On("MarkCommitRecords", mock.Anything).Return().Once() // Only for record 2
+				mf.On("Errors").Return([]*kgo.FetchError{})
+
+				// Mock PollFetches to return the same fetches object repeatedly
+				// so the loop continues after processing
+				emptyFetches := &MockFetches{}
+				emptyFetches.On("Errors").Return([]*kgo.FetchError{})
+				emptyFetches.On("EachRecord", mock.Anything).Return()
+
+				m.On("PollFetches", mock.Anything).Return(mf).Once()
+				m.On("PollFetches", mock.Anything).Return(emptyFetches).Maybe()
+
+				mf.On("EachRecord", mock.Anything).Run(func(args mock.Arguments) {
+					fn := args.Get(0).(func(*kgo.Record))
+					rec1 := &kgo.Record{Topic: "test", Partition: 0, Offset: 0}
+					rec2 := &kgo.Record{Topic: "test", Partition: 0, Offset: 1}
+
+					// First record causes panic in handler
+					mh.On("HandleMessage", mock.Anything, rec1).Run(func(args mock.Arguments) {
+						panic("handler panic")
+					}).Return(Failed, errors.New("not reached")).Once()
+
+					// Second record should still be processed
+					mh.On("HandleMessage", mock.Anything, rec2).Return(Accepted, nil).Once()
+
+					fn(rec1) // Should panic and recover
+					fn(rec2) // Should process normally
+				})
+			},
+			expectContinue:      true,
+			commitCalledForRec1: false, // Should NOT commit panicked record
+			commitCalledForRec2: true,  // Should commit successful record
+		},
+		{
+			name: "panic while marking commit is recovered",
+			setup: func(m *MockClient, mf *MockFetches, mh *MockHandler) {
+				mf.On("Errors").Return([]*kgo.FetchError{})
+
+				// Allow continued polling
+				emptyFetches := &MockFetches{}
+				emptyFetches.On("Errors").Return([]*kgo.FetchError{})
+				emptyFetches.On("EachRecord", mock.Anything).Return()
+
+				m.On("PollFetches", mock.Anything).Return(mf).Once()
+				m.On("PollFetches", mock.Anything).Return(emptyFetches).Maybe()
+
+				// First call to MarkCommitRecords panics
+				m.On("MarkCommitRecords", mock.Anything).Run(func(args mock.Arguments) {
+					panic("commit panic")
+				}).Once()
+
+				mf.On("EachRecord", mock.Anything).Run(func(args mock.Arguments) {
+					fn := args.Get(0).(func(*kgo.Record))
+					rec := &kgo.Record{Topic: "test", Partition: 0, Offset: 0}
+					mh.On("HandleMessage", mock.Anything, rec).Return(Accepted, nil).Once()
+					fn(rec) // Should panic during commit and recover
+				})
+			},
+			expectContinue: true,
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			consumer := GetConsumer()
+			ctx, cancel := context.WithCancel(context.Background())
+			consumer.ctx = ctx
+			consumer.cancel = cancel
+			consumer.running = true
+
+			mockClient := &MockClient{}
+			mf := &MockFetches{}
+			mh := &MockHandler{}
+			consumer.client = mockClient
+			consumer.handler = mh
+
+			if tt.setup != nil {
+				tt.setup(mockClient, mf, mh)
+			}
+
+			done := make(chan struct{})
+			consumer.wg.Add(1)
+			go func() {
+				consumer.pollLoop()
+				close(done)
+			}()
+
+			// Let the poll loop process the records and continue
+			time.Sleep(150 * time.Millisecond)
+
+			// If expect continue, the loop should still be running
+			if tt.expectContinue {
+				s.True(consumer.IsRunning(), "consumer should still be running after message panic")
+			}
+
+			cancel()
+
+			select {
+			case <-done:
+				// exited as expected
+			case <-time.After(1 * time.Second):
+				s.Fail("pollLoop did not exit in time")
+			}
+
+			consumer.wg.Wait()
+
+			mockClient.AssertExpectations(s.T())
+			mf.AssertExpectations(s.T())
+			mh.AssertExpectations(s.T())
+		})
+	}
+}
+
+// TestManageFetchStatePanic tests panic recovery in the fetch state manager
+func (s *ConsumerTestSuite) TestManageFetchStatePanic() {
+	s.Run("panic in manageFetchState is recovered", func() {
+		consumer := GetConsumer()
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		consumer.ctx = ctx
+		consumer.cancel = cancel
+		consumer.consecutiveFailureThreshold = 5
+		consumer.resumeDelaySeconds = 1
+
+		// Force a panic by setting consecutive failures to a very high value
+		// that will trigger pause logic
+		consumer.consecutiveFailures.Store(1000)
+
+		mockClient := &MockClient{}
+		consumer.client = mockClient
+
+		// Mock the pause operation to panic
+		mockClient.On("PauseFetchTopics", mock.Anything).Run(func(args mock.Arguments) {
+			panic("fetch state manager panic")
+		}).Once()
+
+		done := make(chan struct{})
+		consumer.wg.Add(1)
+		go func() {
+			consumer.startManageFetchState()
+			close(done)
+		}()
+
+		// Wait for context timeout or goroutine exit
+		select {
+		case <-done:
+			// Goroutine exited (recovered from panic or context done)
+		case <-time.After(1 * time.Second):
+			s.Fail("startManageFetchState did not exit in time")
+		}
+
+		cancel()
+		consumer.wg.Wait()
+
+		// The panic should have been caught and logged, goroutine should exit cleanly
+	})
+}
+
+// TestPanicRecoveryDoesNotCommitRecord verifies that panicked records are not committed
+func (s *ConsumerTestSuite) TestPanicRecoveryDoesNotCommitRecord() {
+	s.Run("panicked record is not committed", func() {
+		consumer := GetConsumer()
+		ctx, cancel := context.WithCancel(context.Background())
+		consumer.ctx = ctx
+		consumer.cancel = cancel
+
+		mockClient := &MockClient{}
+		mf := &MockFetches{}
+		mh := &MockHandler{}
+		consumer.client = mockClient
+		consumer.handler = mh
+
+		// Track which records were committed
+		committedRecords := make([]*kgo.Record, 0)
+		mockClient.On("MarkCommitRecords", mock.Anything).Run(func(args mock.Arguments) {
+			records := args.Get(0).([]*kgo.Record)
+			committedRecords = append(committedRecords, records...)
+		})
+
+		mf.On("Errors").Return([]*kgo.FetchError{})
+
+		// Allow continued polling with empty fetches
+		emptyFetches := &MockFetches{}
+		emptyFetches.On("Errors").Return([]*kgo.FetchError{})
+		emptyFetches.On("EachRecord", mock.Anything).Return()
+
+		mockClient.On("PollFetches", mock.Anything).Return(mf).Once()
+		mockClient.On("PollFetches", mock.Anything).Return(emptyFetches).Maybe()
+
+		rec1 := &kgo.Record{Topic: "test", Partition: 0, Offset: 100}
+		rec2 := &kgo.Record{Topic: "test", Partition: 0, Offset: 101}
+		rec3 := &kgo.Record{Topic: "test", Partition: 0, Offset: 102}
+
+		mf.On("EachRecord", mock.Anything).Run(func(args mock.Arguments) {
+			fn := args.Get(0).(func(*kgo.Record))
+
+			// Record 1: success
+			mh.On("HandleMessage", mock.Anything, rec1).Return(Accepted, nil).Once()
+			fn(rec1)
+
+			// Record 2: panic
+			mh.On("HandleMessage", mock.Anything, rec2).Run(func(args mock.Arguments) {
+				panic("processing error")
+			}).Return(Failed, errors.New("not reached")).Once()
+			fn(rec2)
+
+			// Record 3: success
+			mh.On("HandleMessage", mock.Anything, rec3).Return(Accepted, nil).Once()
+			fn(rec3)
+		})
+
+		done := make(chan struct{})
+		consumer.wg.Add(1)
+		go func() {
+			consumer.pollLoop()
+			close(done)
+		}()
+
+		// Let processing happen
+		time.Sleep(150 * time.Millisecond)
+		cancel()
+
+		select {
+		case <-done:
+		case <-time.After(1 * time.Second):
+			s.Fail("pollLoop did not exit in time")
+		}
+
+		consumer.wg.Wait()
+
+		// Verify: rec1 and rec3 should be committed, rec2 should NOT
+		s.Len(committedRecords, 2, "should have committed 2 records")
+		offsets := make([]int64, 0, len(committedRecords))
+		for _, rec := range committedRecords {
+			offsets = append(offsets, rec.Offset)
+		}
+		s.Contains(offsets, int64(100), "should have committed record 1")
+		s.Contains(offsets, int64(102), "should have committed record 3")
+		s.NotContains(offsets, int64(101), "should NOT have committed panicked record 2")
+	})
+}
