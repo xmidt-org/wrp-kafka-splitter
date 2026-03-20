@@ -42,6 +42,7 @@ func providePublisher(in PublisherIn) (PublisherOut, error) {
 		publisher.WithMetricsEmitter(in.MetricEmitter),
 
 		// Required options
+		publisher.WithBrokers(cfg.Brokers),
 		publisher.WithTopicRoutes(wrpRoutes...),
 
 		// Optional configurations
