@@ -92,8 +92,8 @@ var fxMetrics = []metricDefinition{
 	{
 		Type:   COUNTER,
 		Name:   PublisherOutcomes,
-		Help:   "Number of successful message publications",
-		Labels: fmt.Sprintf("%s,%s, %s", TopicLabel, TopicShardStrategyLabel, OutcomeLabel),
+		Help:   "Handler outcomes when publishing messages",
+		Labels: OutcomeLabel,
 	},
 	{
 		Type:   COUNTER,

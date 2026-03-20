@@ -220,6 +220,19 @@ func (c *KafkaConsumer) IsRunning() bool {
 func (c *KafkaConsumer) pollLoop() {
 	defer c.wg.Done()
 
+	// Catch any panics to prevent the consumer from silently stopping
+	defer func() {
+		if r := recover(); r != nil {
+			c.emitLog(log.LevelError, "PANIC in consumer poll loop - consumer stopped", map[string]any{
+				"panic": r,
+			})
+			// Mark consumer as not running since this goroutine is terminating
+			c.mu.Lock()
+			c.running = false
+			c.mu.Unlock()
+		}
+	}()
+
 	for {
 		// Check if we should stop
 		select {
@@ -256,6 +269,19 @@ func (c *KafkaConsumer) pollLoop() {
 
 		// Process each record
 		fetches.EachRecord(func(record *kgo.Record) {
+			// Catch panics in individual message processing
+			defer func() {
+				if r := recover(); r != nil {
+					c.emitLog(log.LevelError, "PANIC while processing message", map[string]any{
+						"panic":     r,
+						"topic":     record.Topic,
+						"partition": record.Partition,
+						"offset":    record.Offset,
+					})
+					// Don't commit this record - let it be reprocessed
+				}
+			}()
+
 			if c.isPaused.Load() {
 				// Stop processing remaining records in this batch
 				return
@@ -341,6 +367,15 @@ func (c *KafkaConsumer) handleRetryableError(err error) {
 
 func (c *KafkaConsumer) startManageFetchState() {
 	defer c.wg.Done() // Decrement when this goroutine exits
+
+	// Catch any panics to prevent the fetch state manager from silently stopping
+	defer func() {
+		if r := recover(); r != nil {
+			c.emitLog(log.LevelError, "PANIC in fetch state manager - manager stopped", map[string]any{
+				"panic": r,
+			})
+		}
+	}()
 
 	ticker := time.NewTicker(tickerInterval)
 	defer ticker.Stop()

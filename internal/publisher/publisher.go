@@ -195,6 +195,7 @@ func (p *KafkaPublisher) Produce(ctx context.Context, msg *wrp.Message) (wrpkafk
 	p.mu.RUnlock()
 
 	if !started {
+		p.logEmitter.Notify(log.NewEvent(log.LevelError, "publisher not started", nil))
 		p.metricEmitter.Notify(metrics.Event{
 			Name:  metrics.PublisherErrorsCounter,
 			Value: 1,
@@ -202,7 +203,7 @@ func (p *KafkaPublisher) Produce(ctx context.Context, msg *wrp.Message) (wrpkafk
 				metrics.ErrorTypeLabel, "not_started",
 			},
 		})
-		return 0, ErrPublisherNotStarted // Return 0 (which corresponds to wrpkafka.Accepted) as default
+		return wrpkafka.Failed, ErrPublisherNotStarted
 	}
 
 	outcome, err := p.wrpPublisher.Produce(ctx, msg)

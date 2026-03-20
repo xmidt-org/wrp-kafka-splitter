@@ -161,7 +161,7 @@ func (h *WRPMessageHandler) HandleMessage(ctx context.Context, record *kgo.Recor
 	}
 
 	h.emitLog(log.LevelDebug, "successfully routed WRP message", map[string]any{
-		"outcome": outcome,
+		"outcome": outcome.String(),
 	})
 
 	return getOutcome(outcome), nil

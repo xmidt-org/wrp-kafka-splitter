@@ -21,7 +21,11 @@ servers((replace)):
 
 producer((replace)):
   brokers:
-    - "${KAFKA_BROKERS}"
+    restart_on_config_change: true
+    target_region: local
+    regions:
+      local:
+        - "${KAFKA_BROKERS}"
   topic_routes:
     - pattern: "*"
       topic: "default-events"
