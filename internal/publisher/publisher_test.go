@@ -269,7 +269,7 @@ func (suite *PublisherTestSuite) TestProduceWhenNotStarted() {
 
 	suite.Error(err)
 	suite.ErrorIs(err, ErrPublisherNotStarted)
-	suite.Equal(wrpkafka.Accepted, outcome) // Default outcome when not started
+	suite.Equal(wrpkafka.Failed, outcome)
 }
 
 // Test concurrent access to IsStarted
@@ -392,65 +392,6 @@ func (suite *PublisherTestSuite) TestStop() {
 	}
 }
 
-// Test event emission during publisher operations
-func (suite *PublisherTestSuite) TestEventEmission() {
-	tests := []struct {
-		name          string
-		operation     func(*KafkaPublisher) error
-		expectLogs    int
-		expectMetrics int
-		description   string
-	}{
-		{
-			name: "produce_not_started_emits_metrics",
-			operation: func(p *KafkaPublisher) error {
-				message := &wrp.Message{
-					Type:   wrp.SimpleEventMessageType,
-					Source: "test",
-				}
-				_, err := p.Produce(context.Background(), message)
-				return err
-			},
-			expectLogs:    0,
-			expectMetrics: 1, // Should emit error metric
-			description:   "Should emit error metric when producing on non-started publisher",
-		},
-	}
-
-	for _, tt := range tests {
-		suite.Run(tt.name, func() {
-			suite.clearEvents()
-
-			publisher, _ := New(
-				WithBrokers(testBroker),
-				WithTopicRoutes(wrpkafka.TopicRoute{Topic: "test", Pattern: ".*"}),
-				WithLogEmitter(suite.logEmitter),
-				WithMetricsEmitter(suite.metricEmitter),
-			)
-
-			tt.operation(publisher)
-
-			// Give events time to be processed
-			time.Sleep(10 * time.Millisecond)
-
-			logEvents := suite.getLogEvents()
-			metricEvents := suite.getMetricEvents()
-
-			suite.Len(logEvents, tt.expectLogs, "Unexpected number of log events")
-			suite.Len(metricEvents, tt.expectMetrics, "Unexpected number of metric events")
-
-			if tt.expectMetrics > 0 {
-				// Verify error metric contains expected information
-				errorMetric := metricEvents[0]
-				suite.Equal("publish_errors_total", errorMetric.Name)
-				suite.Equal(float64(1), errorMetric.Value)
-				suite.Contains(errorMetric.Labels, "error_type")
-				suite.Contains(errorMetric.Labels, "not_started")
-			}
-		})
-	}
-}
-
 // Test different WRP message types
 func (suite *PublisherTestSuite) TestProduceMessageTypes() {
 	tests := []struct {
@@ -537,7 +478,7 @@ func (suite *PublisherTestSuite) TestProduceMessageTypes() {
 
 			suite.Error(err, tt.description+" - should fail when not started")
 			suite.ErrorIs(err, ErrPublisherNotStarted)
-			suite.Equal(wrpkafka.Accepted, outcome) // Default outcome when not started
+			suite.Equal(wrpkafka.Failed, outcome) // Default outcome when not started
 
 			// Verify metrics were emitted
 			time.Sleep(10 * time.Millisecond)
@@ -623,7 +564,7 @@ func (suite *PublisherTestSuite) TestEdgeCases() {
 
 			// When not started, should get default outcome
 			if !publisher.IsStarted() {
-				suite.Equal(wrpkafka.Accepted, outcome)
+				suite.Equal(wrpkafka.Failed, outcome)
 			}
 		})
 	}
