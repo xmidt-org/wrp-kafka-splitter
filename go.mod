@@ -6,7 +6,7 @@ require (
 	github.com/alecthomas/kong v1.14.0
 	github.com/aviddiviner/go-murmur v0.0.0-20150519214947-b9740d71e571
 	github.com/go-kit/kit v0.13.0
-	github.com/goschtalt/goschtalt v0.27.0
+	github.com/goschtalt/goschtalt v0.28.1
 	github.com/goschtalt/properties-decoder v0.1.0
 	github.com/goschtalt/yaml-decoder v0.0.1
 	github.com/goschtalt/yaml-encoder v0.0.4
