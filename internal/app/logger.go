@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"go.uber.org/fx/fxevent"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // LogConfig defines the configuration for structured logging using slog.
@@ -34,6 +35,27 @@ type LogConfig struct {
 
 	// EncodeTime defines how to encode the time (iso8601, millis, nanos, rfc3339)
 	EncodeTime string `default:"iso8601"`
+
+	// Rotation configures log rotation for file outputs
+	Rotation RotationConfig
+}
+
+// RotationConfig defines log rotation settings
+type RotationConfig struct {
+	// MaxSize is the maximum size in megabytes of the log file before it gets rotated
+	MaxSize int `yaml:"maxsize" default:"50"`
+
+	// MaxAge is the maximum number of days to retain old log files
+	MaxAge int `yaml:"maxage" default:"2"`
+
+	// MaxBackups is the maximum number of old log files to retain
+	MaxBackups int `yaml:"maxbackups" default:"10"`
+
+	// Compress determines if rotated files should be compressed using gzip
+	Compress bool `yaml:"compress" default:"true"`
+
+	// LocalTime determines if the time used for formatting the timestamps in backup files is the computer's local time
+	LocalTime bool `yaml:"localtime" default:"false"`
 }
 
 // newLogger creates a new structured logger based on the configuration.
@@ -50,11 +72,15 @@ func newLogger(cfg LogConfig) (*slog.Logger, error) {
 		case "stderr":
 			out = os.Stderr
 		default:
-			file, err := os.OpenFile(cfg.OutputPaths[0], os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-			if err != nil {
-				return nil, err
+			// Use rotating logger for file outputs
+			out = &lumberjack.Logger{
+				Filename:   cfg.OutputPaths[0],
+				MaxSize:    cfg.Rotation.MaxSize,
+				MaxAge:     cfg.Rotation.MaxAge,
+				MaxBackups: cfg.Rotation.MaxBackups,
+				Compress:   cfg.Rotation.Compress,
+				LocalTime:  cfg.Rotation.LocalTime,
 			}
-			out = file
 		}
 	default:
 		// For multiple output paths, write to all
@@ -66,11 +92,15 @@ func newLogger(cfg LogConfig) (*slog.Logger, error) {
 			case "stderr":
 				writers = append(writers, os.Stderr)
 			default:
-				file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-				if err != nil {
-					return nil, err
-				}
-				writers = append(writers, file)
+				// Use rotating logger for file outputs
+				writers = append(writers, &lumberjack.Logger{
+					Filename:   path,
+					MaxSize:    cfg.Rotation.MaxSize,
+					MaxAge:     cfg.Rotation.MaxAge,
+					MaxBackups: cfg.Rotation.MaxBackups,
+					Compress:   cfg.Rotation.Compress,
+					LocalTime:  cfg.Rotation.LocalTime,
+				})
 			}
 		}
 		out = io.MultiWriter(writers...)

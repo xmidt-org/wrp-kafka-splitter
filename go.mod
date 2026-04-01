@@ -22,6 +22,7 @@ require (
 	github.com/xmidt-org/wrpkafka v0.1.2
 	go.uber.org/fx v1.24.0
 	gopkg.in/dealancer/validate.v2 v2.1.0
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 require (

@@ -176,6 +176,9 @@ func (s *LoggerTestSuite) TestNewLogger_FileOutput() {
 	s.NoError(err)
 	s.NotNil(logger)
 
+	// Log a message to trigger file creation
+	logger.Info("test message")
+
 	// Verify file was created
 	s.FileExists(logFile)
 }
@@ -189,9 +192,13 @@ func (s *LoggerTestSuite) TestNewLogger_InvalidFilePath() {
 		OutputPaths: []string{invalidPath},
 	}
 
+	// Logger creation succeeds with lumberjack, but writing will fail
 	logger, err := newLogger(cfg)
-	s.Error(err)
-	s.Nil(logger)
+	s.NoError(err)
+	s.NotNil(logger)
+
+	// The error will occur when we try to write, not during logger creation
+	// This is expected behavior with lumberjack
 }
 
 // Test newLogger with multiple outputs
@@ -209,6 +216,9 @@ func (s *LoggerTestSuite) TestNewLogger_MultipleOutputs() {
 	s.NoError(err)
 	s.NotNil(logger)
 
+	// Log a message to trigger file creation
+	logger.Info("test message")
+
 	// Verify files were created
 	s.FileExists(logFile1)
 	s.FileExists(logFile2)
@@ -225,9 +235,16 @@ func (s *LoggerTestSuite) TestNewLogger_MultipleOutputs_WithInvalidPath() {
 		OutputPaths: []string{"stdout", logFile, invalidPath},
 	}
 
+	// Logger creation will succeed with lumberjack even with invalid paths
 	logger, err := newLogger(cfg)
-	s.Error(err)
-	s.Nil(logger)
+	s.NoError(err)
+	s.NotNil(logger)
+
+	// Log a message - some outputs may fail silently but valid ones should work
+	logger.Info("test message")
+
+	// At least the valid log file should be created
+	s.FileExists(logFile)
 }
 
 // Test newLogger logs message to file
