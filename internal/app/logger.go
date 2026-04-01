@@ -43,19 +43,19 @@ type LogConfig struct {
 // RotationConfig defines log rotation settings
 type RotationConfig struct {
 	// MaxSize is the maximum size in megabytes of the log file before it gets rotated
-	MaxSize int `default:"100"`
+	MaxSize int `yaml:"maxsize" default:"50"`
 
 	// MaxAge is the maximum number of days to retain old log files
-	MaxAge int `default:"30"`
+	MaxAge int `yaml:"maxage" default:"2"`
 
 	// MaxBackups is the maximum number of old log files to retain
-	MaxBackups int `default:"3"`
+	MaxBackups int `yaml:"maxbackups" default:"10"`
 
-	// Compress determines if rotated files should be compressed using gzip
-	Compress bool `default:"true"`
+	// Json determines if rotated files should be compressed using gzip
+	Json bool `yaml:"json" default:"true"`
 
 	// LocalTime determines if the time used for formatting the timestamps in backup files is the computer's local time
-	LocalTime bool `default:"false"`
+	LocalTime bool `yaml:"localtime" default:"false"`
 }
 
 // newLogger creates a new structured logger based on the configuration.
@@ -78,7 +78,7 @@ func newLogger(cfg LogConfig) (*slog.Logger, error) {
 				MaxSize:    cfg.Rotation.MaxSize,
 				MaxAge:     cfg.Rotation.MaxAge,
 				MaxBackups: cfg.Rotation.MaxBackups,
-				Compress:   cfg.Rotation.Compress,
+				Compress:   cfg.Rotation.Json,
 				LocalTime:  cfg.Rotation.LocalTime,
 			}
 		}
@@ -98,7 +98,7 @@ func newLogger(cfg LogConfig) (*slog.Logger, error) {
 					MaxSize:    cfg.Rotation.MaxSize,
 					MaxAge:     cfg.Rotation.MaxAge,
 					MaxBackups: cfg.Rotation.MaxBackups,
-					Compress:   cfg.Rotation.Compress,
+					Compress:   cfg.Rotation.Json,
 					LocalTime:  cfg.Rotation.LocalTime,
 				})
 			}

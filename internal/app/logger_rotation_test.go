@@ -29,7 +29,7 @@ func TestNewLogger_WithRotation(t *testing.T) {
 			MaxSize:    1, // 1 MB for quick testing
 			MaxAge:     1, // 1 day
 			MaxBackups: 2, // Keep 2 backups
-			Compress:   true,
+			Json:       true,
 			LocalTime:  true,
 		},
 	}
@@ -74,7 +74,7 @@ func TestNewLogger_MultipleOutputsWithRotation(t *testing.T) {
 			MaxSize:    5,
 			MaxAge:     7,
 			MaxBackups: 3,
-			Compress:   false,
+			Json:       false,
 			LocalTime:  false,
 		},
 	}
@@ -138,6 +138,6 @@ func TestRotationConfig_DefaultValues(t *testing.T) {
 	assert.Equal(t, 0, cfg.MaxSize)
 	assert.Equal(t, 0, cfg.MaxAge)
 	assert.Equal(t, 0, cfg.MaxBackups)
-	assert.False(t, cfg.Compress)
+	assert.False(t, cfg.Json)
 	assert.False(t, cfg.LocalTime)
 }
