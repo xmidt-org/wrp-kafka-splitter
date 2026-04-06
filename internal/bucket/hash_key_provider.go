@@ -83,10 +83,10 @@ func (h HashKey) GetHashKey(msg *wrp.Message) (string, error) {
 		return "", nil
 	case HashKeyMetadata:
 		if h.MetadataField == "" {
-			return "", fmt.Errorf("metadata key field cannot be empty: %w", ErrEmptyHashKey)
+			return "", fmt.Errorf("metadata field name cannot be empty: %w", ErrEmptyHashKey)
 		}
 		if msg.Metadata == nil {
-			return "", ErrEmptyHashKey
+			return "", fmt.Errorf("message metadata is nil: %w", ErrEmptyHashKey)
 		}
 
 		// Checking for both the raw field and the field with a leading slash
@@ -94,16 +94,16 @@ func (h HashKey) GetHashKey(msg *wrp.Message) (string, error) {
 		if !ok {
 			hashKey, ok = msg.Metadata["/"+h.MetadataField]
 			if !ok {
-				return "", ErrEmptyHashKey
+				return "", fmt.Errorf("metadata field %q not found: %w", h.MetadataField, ErrEmptyHashKey)
 			}
 		}
 		if hashKey == "" {
-			return "", ErrEmptyHashKey
+			return "", fmt.Errorf("metadata field %q has empty value: %w", h.MetadataField, ErrEmptyHashKey)
 		}
 		return hashKey, nil
 	case HashKeySource:
 		if msg.Source == "" {
-			return "", ErrEmptyHashKey
+			return "", fmt.Errorf("source field is empty: %w", ErrEmptyHashKey)
 		}
 		deviceID, err := wrp.ParseDeviceID(msg.Source)
 		if err != nil {

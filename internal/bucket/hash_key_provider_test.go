@@ -188,7 +188,7 @@ func (s *HashKeyProviderSuite) TestGetHashKey_Metadata_EmptyFieldName() {
 	hashKey := HashKey{Name: HashKeyMetadata, MetadataField: ""}
 	key, err := hashKey.GetHashKey(msg)
 	assert.Error(s.T(), err)
-	assert.Contains(s.T(), err.Error(), "metadata key field cannot be empty")
+	assert.Contains(s.T(), err.Error(), "metadata field name cannot be empty")
 	assert.Equal(s.T(), "", key)
 }
 

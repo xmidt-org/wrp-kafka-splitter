@@ -144,8 +144,9 @@ func (h *WRPMessageHandler) HandleMessage(ctx context.Context, record *kgo.Recor
 
 	if !inTargetBucket {
 		h.emitLog(log.LevelDebug, "message not in target bucket, skipping", map[string]any{
-			"source":      msg.Source,
-			"destination": msg.Destination,
+			"source":   msg.Source,
+			"metadata": msg.Metadata,
+			"bucket":   h.buckets,
 		})
 
 		return Skipped, nil
