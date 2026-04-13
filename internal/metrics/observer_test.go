@@ -262,3 +262,208 @@ func TestHistogramObserver(t *testing.T) {
 		})
 	}
 }
+
+// TestSubjectUnknownMetrics tests the flag-based unknown metrics tracking in subject
+func TestSubjectUnknownMetrics(t *testing.T) {
+	tests := []struct {
+		name          string
+		events        []Event
+		expectedCalls []struct{ metricName, metricType string }
+	}{
+		{
+			name: "tracks unknown metrics not in any observer",
+			events: []Event{
+				{Name: "completely_unknown", Labels: []string{}, Value: 1.0},
+				{Name: "another_unknown", Labels: []string{}, Value: 2.0},
+			},
+			expectedCalls: []struct{ metricName, metricType string }{
+				{"completely_unknown", "unknown"},
+				{"another_unknown", "unknown"},
+			},
+		},
+		{
+			name: "does not track metrics that exist in counter observer",
+			events: []Event{
+				{Name: "fetch_errors", Labels: []string{}, Value: 1.0},
+				{Name: "completely_unknown", Labels: []string{}, Value: 1.0},
+			},
+			expectedCalls: []struct{ metricName, metricType string }{
+				{"completely_unknown", "unknown"},
+			},
+		},
+		{
+			name: "does not track metrics that exist in gauge observer",
+			events: []Event{
+				{Name: "fetch_pauses", Labels: []string{}, Value: 1.0},
+				{Name: "completely_unknown", Labels: []string{}, Value: 1.0},
+			},
+			expectedCalls: []struct{ metricName, metricType string }{
+				{"completely_unknown", "unknown"},
+			},
+		},
+		{
+			name: "does not track metrics that exist in histogram observer",
+			events: []Event{
+				{Name: "kafka_publish_latency_seconds", Labels: []string{}, Value: 1.0},
+				{Name: "completely_unknown", Labels: []string{}, Value: 1.0},
+			},
+			expectedCalls: []struct{ metricName, metricType string }{
+				{"completely_unknown", "unknown"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			unknownCounter := &MockCounter{}
+
+			// Set up expectations for unknown metric calls
+			for _, call := range tt.expectedCalls {
+				unknownCounter.On("With",
+					[]string{"metric_name", call.metricName, "metric_type", call.metricType}).Return(unknownCounter)
+				unknownCounter.On("Add", 1.0).Return()
+			}
+
+			// Create mocks for known metrics that might be called
+			fetchErrorsCounter := &MockCounter{}
+			fetchPausesGauge := &MockGauge{}
+			kafkaLatencyHistogram := &MockHistogram{}
+
+			// Set up expectations for known metrics that will be called in tests
+			for _, event := range tt.events {
+				switch event.Name {
+				case "fetch_errors":
+					fetchErrorsCounter.On("With", event.Labels).Return(fetchErrorsCounter)
+					fetchErrorsCounter.On("Add", event.Value).Return()
+				case "fetch_pauses":
+					fetchPausesGauge.On("With", event.Labels).Return(fetchPausesGauge)
+					fetchPausesGauge.On("Set", event.Value).Return()
+				case "kafka_publish_latency_seconds":
+					kafkaLatencyHistogram.On("With", event.Labels).Return(kafkaLatencyHistogram)
+					kafkaLatencyHistogram.On("Observe", event.Value).Return()
+				}
+			}
+
+			// Create a metrics struct with real metric maps
+			mockMetrics := Metrics{
+				ConsumerFetchErrors:    fetchErrorsCounter,
+				ConsumerCommitErrors:   &MockCounter{},
+				ConsumerPauses:         fetchPausesGauge,
+				BucketKeyErrorCount:    &MockCounter{},
+				PublisherOutcomes:      &MockCounter{},
+				PublisherErrorsCounter: &MockCounter{},
+				KafkaPublished:         &MockCounter{},
+				KafkaPublishLatency:    kafkaLatencyHistogram,
+				Panics:                 &MockCounter{},
+				UnknownMetrics:         unknownCounter,
+			}
+
+			subject := New(mockMetrics)
+
+			// Send events synchronously
+			for _, event := range tt.events {
+				subject.NotifySync(event)
+			}
+
+			unknownCounter.AssertExpectations(t)
+			fetchErrorsCounter.AssertExpectations(t)
+			fetchPausesGauge.AssertExpectations(t)
+			kafkaLatencyHistogram.AssertExpectations(t)
+		})
+	}
+}
+
+func TestSubjectUnknownMetricsNil(t *testing.T) {
+	// Test that nil unknown metrics counter doesn't cause panics
+	mockMetrics := Metrics{
+		ConsumerFetchErrors:    &MockCounter{},
+		ConsumerCommitErrors:   &MockCounter{},
+		ConsumerPauses:         &MockGauge{},
+		BucketKeyErrorCount:    &MockCounter{},
+		PublisherOutcomes:      &MockCounter{},
+		PublisherErrorsCounter: &MockCounter{},
+		KafkaPublished:         &MockCounter{},
+		KafkaPublishLatency:    &MockHistogram{},
+		Panics:                 &MockCounter{},
+		UnknownMetrics:         nil, // nil unknown counter
+	}
+	subject := New(mockMetrics)
+
+	assert.NotPanics(t, func() {
+		subject.NotifySync(Event{Name: "unknown", Labels: []string{}, Value: 1.0})
+	})
+}
+
+func TestObserverReturnValues(t *testing.T) {
+	t.Run("counter observer returns true when metric exists", func(t *testing.T) {
+		counter := &MockCounter{}
+		counter.On("With", []string{"label1", "value1"}).Return(counter)
+		counter.On("Add", 5.0).Return()
+
+		counters := map[string]kit.Counter{
+			"test_counter": counter,
+		}
+		observer := NewCounterObserver(counters)
+
+		handled := observer.HandleEvent(Event{
+			Name:   "test_counter",
+			Labels: []string{"label1", "value1"},
+			Value:  5.0,
+		})
+
+		assert.True(t, handled)
+		counter.AssertExpectations(t)
+	})
+
+	t.Run("counter observer returns false when metric does not exist", func(t *testing.T) {
+		observer := NewCounterObserver(map[string]kit.Counter{})
+
+		handled := observer.HandleEvent(Event{
+			Name:   "unknown_counter",
+			Labels: []string{},
+			Value:  1.0,
+		})
+
+		assert.False(t, handled)
+	})
+
+	t.Run("gauge observer returns true when metric exists", func(t *testing.T) {
+		gauge := &MockGauge{}
+		gauge.On("With", []string{}).Return(gauge)
+		gauge.On("Set", 42.0).Return()
+
+		gauges := map[string]kit.Gauge{
+			"test_gauge": gauge,
+		}
+		observer := NewGaugeObserver(gauges)
+
+		handled := observer.HandleEvent(Event{
+			Name:   "test_gauge",
+			Labels: []string{},
+			Value:  42.0,
+		})
+
+		assert.True(t, handled)
+		gauge.AssertExpectations(t)
+	})
+
+	t.Run("histogram observer returns true when metric exists", func(t *testing.T) {
+		histogram := &MockHistogram{}
+		histogram.On("With", []string{}).Return(histogram)
+		histogram.On("Observe", 0.123).Return()
+
+		histograms := map[string]kit.Histogram{
+			"test_histogram": histogram,
+		}
+		observer := NewHistogramObserver(histograms)
+
+		handled := observer.HandleEvent(Event{
+			Name:   "test_histogram",
+			Labels: []string{},
+			Value:  0.123,
+		})
+
+		assert.True(t, handled)
+		histogram.AssertExpectations(t)
+	})
+}

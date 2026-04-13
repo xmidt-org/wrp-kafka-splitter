@@ -45,6 +45,7 @@ const (
 	KafkaPublishLatency    = "kafka_publish_latency_seconds"
 	KafkaBufferUtilization = "kafka_buffer_utilization_percentage"
 	Panics                 = "panics_total"
+	UnknownMetrics         = "unknown_metrics_total"
 )
 
 // labels

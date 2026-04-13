@@ -22,6 +22,7 @@ type Metrics struct {
 	KafkaPublished      kit.Counter
 	KafkaPublishLatency kit.Histogram
 	Panics              kit.Counter
+	UnknownMetrics      kit.Counter
 }
 
 type Metric struct {
@@ -30,11 +31,11 @@ type Metric struct {
 	histogram kit.Histogram
 }
 
-// New creates a new Subject for metric events with the 3 standard observers
+// New creates a new Subject for metric events with unknown metrics tracking
 func New(m Metrics) *observe.Subject[Event] {
 	subject := observe.NewSubject[Event]()
 
-	// Create counter observer with all counters
+	// Create observers
 	counterMetrics := map[string]kit.Counter{
 		"fetch_errors":                   m.ConsumerFetchErrors,
 		"commit_errors":                  m.ConsumerCommitErrors,
@@ -43,14 +44,13 @@ func New(m Metrics) *observe.Subject[Event] {
 		"publish_errors_total":           m.PublisherErrorsCounter,
 		"kafka_messages_published_total": m.KafkaPublished,
 		"panics_total":                   m.Panics,
+		"unknown_metrics_total":          m.UnknownMetrics,
 	}
 
-	// Create gauge observer with all gauges
 	gaugeMetrics := map[string]kit.Gauge{
 		"fetch_pauses": m.ConsumerPauses,
 	}
 
-	// Create histogram observer with all histograms
 	histogramMetrics := map[string]kit.Histogram{
 		"kafka_publish_latency_seconds": m.KafkaPublishLatency,
 	}
@@ -59,9 +59,20 @@ func New(m Metrics) *observe.Subject[Event] {
 	gaugeObserver := NewGaugeObserver(gaugeMetrics)
 	histogramObserver := NewHistogramObserver(histogramMetrics)
 
-	subject.Attach(counterObserver.HandleEvent)
-	subject.Attach(gaugeObserver.HandleEvent)
-	subject.Attach(histogramObserver.HandleEvent)
+	// Create a handler that calls all observers and tracks unknown metrics
+	handleEvent := func(event Event) {
+		// Call all observers and collect their results
+		counterHandled := counterObserver.HandleEvent(event)
+		gaugeHandled := gaugeObserver.HandleEvent(event)
+		histogramHandled := histogramObserver.HandleEvent(event)
+
+		// If no observer handled the event, it's unknown
+		if !counterHandled && !gaugeHandled && !histogramHandled && m.UnknownMetrics != nil {
+			m.UnknownMetrics.With("metric_name", event.Name, "metric_type", "unknown").Add(1)
+		}
+	}
+
+	subject.Attach(handleEvent)
 
 	return subject
 }

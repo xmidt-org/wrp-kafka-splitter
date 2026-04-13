@@ -37,7 +37,8 @@ func NewHistogramObserver(histograms map[string]kit.Histogram) *HistogramObserve
 	return &HistogramObserver{histograms: histograms}
 }
 
-func (c *CounterObserver) HandleEvent(event Event) {
+// HandleEvent processes counter events
+func (c *CounterObserver) HandleEvent(event Event) bool {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("ERROR: Prometheus panic for counter metric '%s': %v (labels: %v)\n", event.Name, r, event.Labels)
@@ -46,17 +47,18 @@ func (c *CounterObserver) HandleEvent(event Event) {
 
 	counter, ok := c.counters[event.Name]
 	if !ok {
-		// Silently ignore unknown metrics
-		return
+		return false
 	}
 	if counter == nil {
 		fmt.Printf("ERROR: counter for metric '%s' is nil\n", event.Name)
-		return
+		return false
 	}
 	counter.With(event.Labels...).Add(event.Value)
+	return true
 }
 
-func (g *GaugeObserver) HandleEvent(event Event) {
+// HandleEvent processes gauge events
+func (g *GaugeObserver) HandleEvent(event Event) bool {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("ERROR: Prometheus panic for gauge metric '%s': %v (labels: %v)\n", event.Name, r, event.Labels)
@@ -65,17 +67,18 @@ func (g *GaugeObserver) HandleEvent(event Event) {
 
 	gauge, ok := g.gauges[event.Name]
 	if !ok {
-		// Silently ignore unknown metrics
-		return
+		return false
 	}
 	if gauge == nil {
 		fmt.Printf("ERROR: gauge for metric '%s' is nil\n", event.Name)
-		return
+		return false
 	}
 	gauge.With(event.Labels...).Set(event.Value)
+	return true
 }
 
-func (h *HistogramObserver) HandleEvent(event Event) {
+// HandleEvent processes histogram events
+func (h *HistogramObserver) HandleEvent(event Event) bool {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("ERROR: Prometheus panic for histogram metric '%s': %v (labels: %v)\n", event.Name, r, event.Labels)
@@ -84,12 +87,12 @@ func (h *HistogramObserver) HandleEvent(event Event) {
 
 	histogram, ok := h.histograms[event.Name]
 	if !ok {
-		// Silently ignore unknown metrics
-		return
+		return false
 	}
 	if histogram == nil {
 		fmt.Printf("ERROR: histogram for metric '%s' is nil\n", event.Name)
-		return
+		return false
 	}
 	histogram.With(event.Labels...).Observe(event.Value)
+	return true
 }

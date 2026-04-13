@@ -23,6 +23,7 @@ type MetricsIn struct {
 	KafkaPublished         kit.Counter   `name:"kafka_messages_published_total"`
 	KafkaPublishLatency    kit.Histogram `name:"kafka_publish_latency_seconds"`
 	Panics                 kit.Counter   `name:"panics_total"`
+	UnknownMetrics         kit.Counter   `name:"unknown_metrics_total"`
 }
 
 type metricsObserverIn struct {
@@ -48,6 +49,7 @@ var MetricObserversModule = fx.Module("metrics_observers",
 				Panics:                 in.Panics,
 				KafkaPublished:         in.KafkaPublished,
 				KafkaPublishLatency:    in.KafkaPublishLatency,
+				UnknownMetrics:         in.UnknownMetrics,
 			}
 		}),
 	fx.Provide(

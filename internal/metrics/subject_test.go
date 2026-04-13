@@ -21,6 +21,7 @@ func createMinimalMetrics() Metrics {
 		KafkaPublished:         &MockCounter{},
 		KafkaPublishLatency:    &MockHistogram{},
 		Panics:                 &MockCounter{},
+		UnknownMetrics:         &MockCounter{},
 	}
 }
 
@@ -121,13 +122,17 @@ func TestSubjectNotify(t *testing.T) {
 			verifyMocks: true,
 		},
 		{
-			name: "unknown metric name ignored",
+			name: "unknown metric tracked by unknown metrics observer",
 			setupMetrics: func() (Metrics, []string) {
 				counter := &MockCounter{}
-				// No expectations set - methods should not be called
+				unknownCounter := &MockCounter{}
+				// Set up expectations for unknown metrics tracking
+				unknownCounter.On("With", []string{"metric_name", "unknown_metric_name", "metric_type", "unknown"}).Return(unknownCounter)
+				unknownCounter.On("Add", 1.0).Return()
 
 				mockMetrics := createMinimalMetrics()
 				mockMetrics.ConsumerFetchErrors = counter
+				mockMetrics.UnknownMetrics = unknownCounter
 				return mockMetrics, []string{}
 			},
 			event: Event{
@@ -136,7 +141,7 @@ func TestSubjectNotify(t *testing.T) {
 				Value:  10.0,
 			},
 			useSync:     false,
-			verifyMocks: false, // No mock calls expected
+			verifyMocks: true, // Now we expect calls to unknown metrics
 		},
 	}
 
@@ -180,10 +185,9 @@ func TestSubjectNotify(t *testing.T) {
 					}
 				}
 			} else if tt.event.Name == "unknown_metric_name" {
-				// Verify counter was never called for unknown metrics
-				if counter, ok := mockMetrics.ConsumerFetchErrors.(*MockCounter); ok {
-					counter.AssertNotCalled(t, "With")
-					counter.AssertNotCalled(t, "Add")
+				// Verify unknown metrics counter was called
+				if unknownCounter, ok := mockMetrics.UnknownMetrics.(*MockCounter); ok {
+					unknownCounter.AssertExpectations(t)
 				}
 			}
 		})
