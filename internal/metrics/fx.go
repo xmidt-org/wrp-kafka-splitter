@@ -46,6 +46,7 @@ const (
 	KafkaBufferUtilization = "kafka_buffer_utilization_percentage"
 	Panics                 = "panics_total"
 	UnknownMetrics         = "unknown_metrics_total"
+	MetricPanics           = "metric_panics_total"
 )
 
 // labels

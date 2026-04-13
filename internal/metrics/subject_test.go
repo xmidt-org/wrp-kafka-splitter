@@ -22,6 +22,7 @@ func createMinimalMetrics() Metrics {
 		KafkaPublishLatency:    &MockHistogram{},
 		Panics:                 &MockCounter{},
 		UnknownMetrics:         &MockCounter{},
+		MetricPanics:           &MockCounter{},
 	}
 }
 

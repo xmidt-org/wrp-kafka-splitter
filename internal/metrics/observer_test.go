@@ -88,7 +88,7 @@ func TestCounterObserver(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			counters := tt.setupCounters()
-			observer := NewCounterObserver(counters)
+			observer := NewCounterObserver(counters, nil)
 
 			for _, event := range tt.events {
 				if tt.expectPanic {
@@ -165,7 +165,7 @@ func TestGaugeObserver(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gauges := tt.setupGauges()
-			observer := NewGaugeObserver(gauges)
+			observer := NewGaugeObserver(gauges, nil)
 
 			for _, event := range tt.events {
 				if tt.shouldPanic {
@@ -238,7 +238,7 @@ func TestHistogramObserver(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			histograms := tt.setupHistograms()
-			observer := NewHistogramObserver(histograms)
+			observer := NewHistogramObserver(histograms, nil)
 
 			for _, event := range tt.events {
 				if tt.shouldPanic {
@@ -356,6 +356,7 @@ func TestSubjectUnknownMetrics(t *testing.T) {
 				KafkaPublishLatency:    kafkaLatencyHistogram,
 				Panics:                 &MockCounter{},
 				UnknownMetrics:         unknownCounter,
+				MetricPanics:           &MockCounter{},
 			}
 
 			subject := New(mockMetrics)
@@ -386,6 +387,7 @@ func TestSubjectUnknownMetricsNil(t *testing.T) {
 		KafkaPublishLatency:    &MockHistogram{},
 		Panics:                 &MockCounter{},
 		UnknownMetrics:         nil, // nil unknown counter
+		MetricPanics:           &MockCounter{},
 	}
 	subject := New(mockMetrics)
 
@@ -403,7 +405,7 @@ func TestObserverReturnValues(t *testing.T) {
 		counters := map[string]kit.Counter{
 			"test_counter": counter,
 		}
-		observer := NewCounterObserver(counters)
+		observer := NewCounterObserver(counters, nil)
 
 		handled := observer.HandleEvent(Event{
 			Name:   "test_counter",
@@ -416,7 +418,7 @@ func TestObserverReturnValues(t *testing.T) {
 	})
 
 	t.Run("counter observer returns false when metric does not exist", func(t *testing.T) {
-		observer := NewCounterObserver(map[string]kit.Counter{})
+		observer := NewCounterObserver(map[string]kit.Counter{}, nil)
 
 		handled := observer.HandleEvent(Event{
 			Name:   "unknown_counter",
@@ -435,7 +437,7 @@ func TestObserverReturnValues(t *testing.T) {
 		gauges := map[string]kit.Gauge{
 			"test_gauge": gauge,
 		}
-		observer := NewGaugeObserver(gauges)
+		observer := NewGaugeObserver(gauges, nil)
 
 		handled := observer.HandleEvent(Event{
 			Name:   "test_gauge",
@@ -455,7 +457,7 @@ func TestObserverReturnValues(t *testing.T) {
 		histograms := map[string]kit.Histogram{
 			"test_histogram": histogram,
 		}
-		observer := NewHistogramObserver(histograms)
+		observer := NewHistogramObserver(histograms, nil)
 
 		handled := observer.HandleEvent(Event{
 			Name:   "test_histogram",
@@ -465,5 +467,112 @@ func TestObserverReturnValues(t *testing.T) {
 
 		assert.True(t, handled)
 		histogram.AssertExpectations(t)
+	})
+}
+
+func TestObserverPanicTracking(t *testing.T) {
+	t.Run("counter observer tracks panics", func(t *testing.T) {
+		panicCounter := &MockCounter{}
+		panicCounter.On("With", []string{"metric_name", "test_counter", "metric_type", "counter"}).Return(panicCounter)
+		panicCounter.On("Add", 1.0).Return()
+
+		counter := &MockCounter{}
+		counter.On("With", []string{"label1", "value1"}).Return(counter)
+		counter.On("Add", 5.0).Run(func(args mock.Arguments) {
+			panic("test panic")
+		})
+
+		counters := map[string]kit.Counter{
+			"test_counter": counter,
+		}
+		observer := NewCounterObserver(counters, panicCounter)
+
+		handled := observer.HandleEvent(Event{
+			Name:   "test_counter",
+			Labels: []string{"label1", "value1"},
+			Value:  5.0,
+		})
+
+		assert.False(t, handled) // Should return false when panic occurs
+		counter.AssertExpectations(t)
+		panicCounter.AssertExpectations(t)
+	})
+
+	t.Run("gauge observer tracks panics", func(t *testing.T) {
+		panicCounter := &MockCounter{}
+		panicCounter.On("With", []string{"metric_name", "test_gauge", "metric_type", "gauge"}).Return(panicCounter)
+		panicCounter.On("Add", 1.0).Return()
+
+		gauge := &MockGauge{}
+		gauge.On("With", []string{}).Return(gauge)
+		gauge.On("Set", 42.0).Run(func(args mock.Arguments) {
+			panic("test panic")
+		})
+
+		gauges := map[string]kit.Gauge{
+			"test_gauge": gauge,
+		}
+		observer := NewGaugeObserver(gauges, panicCounter)
+
+		handled := observer.HandleEvent(Event{
+			Name:   "test_gauge",
+			Labels: []string{},
+			Value:  42.0,
+		})
+
+		assert.False(t, handled)
+		gauge.AssertExpectations(t)
+		panicCounter.AssertExpectations(t)
+	})
+
+	t.Run("histogram observer tracks panics", func(t *testing.T) {
+		panicCounter := &MockCounter{}
+		panicCounter.On("With", []string{"metric_name", "test_histogram", "metric_type", "histogram"}).Return(panicCounter)
+		panicCounter.On("Add", 1.0).Return()
+
+		histogram := &MockHistogram{}
+		histogram.On("With", []string{}).Return(histogram)
+		histogram.On("Observe", 0.123).Run(func(args mock.Arguments) {
+			panic("test panic")
+		})
+
+		histograms := map[string]kit.Histogram{
+			"test_histogram": histogram,
+		}
+		observer := NewHistogramObserver(histograms, panicCounter)
+
+		handled := observer.HandleEvent(Event{
+			Name:   "test_histogram",
+			Labels: []string{},
+			Value:  0.123,
+		})
+
+		assert.False(t, handled)
+		histogram.AssertExpectations(t)
+		panicCounter.AssertExpectations(t)
+	})
+
+	t.Run("nil panic counter doesn't cause issues", func(t *testing.T) {
+		counter := &MockCounter{}
+		counter.On("With", []string{}).Return(counter)
+		counter.On("Add", 5.0).Run(func(args mock.Arguments) {
+			panic("test panic")
+		})
+
+		counters := map[string]kit.Counter{
+			"test_counter": counter,
+		}
+		observer := NewCounterObserver(counters, nil) // nil panic counter
+
+		assert.NotPanics(t, func() {
+			handled := observer.HandleEvent(Event{
+				Name:   "test_counter",
+				Labels: []string{},
+				Value:  5.0,
+			})
+			assert.False(t, handled) // Should return false when panic occurs
+		})
+
+		counter.AssertExpectations(t)
 	})
 }

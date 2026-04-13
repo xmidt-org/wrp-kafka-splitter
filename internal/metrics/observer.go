@@ -11,30 +11,33 @@ import (
 
 // Generic observers that can handle multiple metrics of the same type
 type CounterObserver struct {
-	counters map[string]kit.Counter
+	counters     map[string]kit.Counter
+	panicCounter kit.Counter
 }
 
 type GaugeObserver struct {
-	gauges map[string]kit.Gauge
+	gauges       map[string]kit.Gauge
+	panicCounter kit.Counter
 }
 
 type HistogramObserver struct {
-	histograms map[string]kit.Histogram
+	histograms   map[string]kit.Histogram
+	panicCounter kit.Counter
 }
 
 // NewCounterObserver creates a new observer for counter metrics
-func NewCounterObserver(counters map[string]kit.Counter) *CounterObserver {
-	return &CounterObserver{counters: counters}
+func NewCounterObserver(counters map[string]kit.Counter, panicCounter kit.Counter) *CounterObserver {
+	return &CounterObserver{counters: counters, panicCounter: panicCounter}
 }
 
 // NewGaugeObserver creates a new observer for gauge metrics
-func NewGaugeObserver(gauges map[string]kit.Gauge) *GaugeObserver {
-	return &GaugeObserver{gauges: gauges}
+func NewGaugeObserver(gauges map[string]kit.Gauge, panicCounter kit.Counter) *GaugeObserver {
+	return &GaugeObserver{gauges: gauges, panicCounter: panicCounter}
 }
 
 // NewHistogramObserver creates a new observer for histogram metrics
-func NewHistogramObserver(histograms map[string]kit.Histogram) *HistogramObserver {
-	return &HistogramObserver{histograms: histograms}
+func NewHistogramObserver(histograms map[string]kit.Histogram, panicCounter kit.Counter) *HistogramObserver {
+	return &HistogramObserver{histograms: histograms, panicCounter: panicCounter}
 }
 
 // HandleEvent processes counter events
@@ -42,6 +45,9 @@ func (c *CounterObserver) HandleEvent(event Event) bool {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("ERROR: Prometheus panic for counter metric '%s': %v (labels: %v)\n", event.Name, r, event.Labels)
+			if c.panicCounter != nil {
+				c.panicCounter.With("metric_name", event.Name, "metric_type", "counter").Add(1)
+			}
 		}
 	}()
 
@@ -62,6 +68,9 @@ func (g *GaugeObserver) HandleEvent(event Event) bool {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("ERROR: Prometheus panic for gauge metric '%s': %v (labels: %v)\n", event.Name, r, event.Labels)
+			if g.panicCounter != nil {
+				g.panicCounter.With("metric_name", event.Name, "metric_type", "gauge").Add(1)
+			}
 		}
 	}()
 
@@ -82,6 +91,9 @@ func (h *HistogramObserver) HandleEvent(event Event) bool {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("ERROR: Prometheus panic for histogram metric '%s': %v (labels: %v)\n", event.Name, r, event.Labels)
+			if h.panicCounter != nil {
+				h.panicCounter.With("metric_name", event.Name, "metric_type", "histogram").Add(1)
+			}
 		}
 	}()
 

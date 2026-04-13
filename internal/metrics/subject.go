@@ -23,6 +23,7 @@ type Metrics struct {
 	KafkaPublishLatency kit.Histogram
 	Panics              kit.Counter
 	UnknownMetrics      kit.Counter
+	MetricPanics        kit.Counter
 }
 
 type Metric struct {
@@ -54,9 +55,9 @@ func New(m Metrics) *observe.Subject[Event] {
 		KafkaPublishLatency: m.KafkaPublishLatency,
 	}
 
-	counterObserver := NewCounterObserver(counterMetrics)
-	gaugeObserver := NewGaugeObserver(gaugeMetrics)
-	histogramObserver := NewHistogramObserver(histogramMetrics)
+	counterObserver := NewCounterObserver(counterMetrics, m.MetricPanics)
+	gaugeObserver := NewGaugeObserver(gaugeMetrics, m.MetricPanics)
+	histogramObserver := NewHistogramObserver(histogramMetrics, m.MetricPanics)
 
 	// Create a handler that calls all observers and tracks unknown metrics
 	handleEvent := func(event Event) {
