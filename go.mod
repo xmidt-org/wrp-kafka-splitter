@@ -115,7 +115,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/xmidt-org/arrange v0.5.3
 	github.com/xmidt-org/candlelight v0.2.6
-	github.com/xmidt-org/touchstone v0.1.7
+	github.com/xmidt-org/touchstone v0.1.8
 	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.1 // indirect
