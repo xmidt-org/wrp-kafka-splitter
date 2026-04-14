@@ -19,7 +19,7 @@ require (
 	github.com/twmb/franz-go/plugin/kprom v1.3.0
 	github.com/xmidt-org/httpaux v0.4.3
 	github.com/xmidt-org/wrp-go/v5 v5.4.1
-	github.com/xmidt-org/wrpkafka v0.1.4
+	github.com/xmidt-org/wrpkafka v0.1.6
 	go.uber.org/fx v1.24.0
 	gopkg.in/dealancer/validate.v2 v2.1.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
@@ -78,7 +78,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
-	github.com/xmidt-org/eventor v1.0.43 // indirect
+	github.com/xmidt-org/eventor v1.0.45 // indirect
 	github.com/xmidt-org/wrp-go/v3 v3.7.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
