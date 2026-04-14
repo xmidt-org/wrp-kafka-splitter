@@ -46,7 +46,7 @@ func (c *CounterObserver) HandleEvent(event Event) bool {
 		if r := recover(); r != nil {
 			fmt.Printf("ERROR: Prometheus panic for counter metric '%s': %v (labels: %v)\n", event.Name, r, event.Labels)
 			if c.panicCounter != nil {
-				c.panicCounter.With("metric_name", event.Name, "metric_type", "counter").Add(1)
+				c.panicCounter.With(MetricNameLabel, event.Name, MetricTypeLabel, "counter").Add(1)
 			}
 		}
 	}()
@@ -69,7 +69,7 @@ func (g *GaugeObserver) HandleEvent(event Event) bool {
 		if r := recover(); r != nil {
 			fmt.Printf("ERROR: Prometheus panic for gauge metric '%s': %v (labels: %v)\n", event.Name, r, event.Labels)
 			if g.panicCounter != nil {
-				g.panicCounter.With("metric_name", event.Name, "metric_type", "gauge").Add(1)
+				g.panicCounter.With(MetricNameLabel, event.Name, MetricTypeLabel, "gauge").Add(1)
 			}
 		}
 	}()
@@ -92,7 +92,7 @@ func (h *HistogramObserver) HandleEvent(event Event) bool {
 		if r := recover(); r != nil {
 			fmt.Printf("ERROR: Prometheus panic for histogram metric '%s': %v (labels: %v)\n", event.Name, r, event.Labels)
 			if h.panicCounter != nil {
-				h.panicCounter.With("metric_name", event.Name, "metric_type", "histogram").Add(1)
+				h.panicCounter.With(MetricNameLabel, event.Name, MetricTypeLabel, "histogram").Add(1)
 			}
 		}
 	}()

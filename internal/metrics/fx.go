@@ -60,6 +60,8 @@ const (
 	TopicShardStrategyLabel = "topic_shard_strategy"
 	OutcomeLabel            = "outcome"
 	PanicTypeLabel          = "panic_type"
+	MetricNameLabel         = "metric_name"
+	MetricTypeLabel         = "metric_type"
 )
 
 // canned values
@@ -130,11 +132,22 @@ var fxMetrics = []metricDefinition{
 		GaugeFunc: getKafkaBufferUtilization,
 	},
 	{
-		Type: COUNTER,
-		Name: Panics,
-		Help: "Total number of panics encountered",
-
+		Type:   COUNTER,
+		Name:   Panics,
+		Help:   "Total number of panics encountered",
 		Labels: PanicTypeLabel,
+	},
+	{
+		Type:   COUNTER,
+		Name:   UnknownMetrics,
+		Help:   "Number of events with unknown metric names",
+		Labels: fmt.Sprintf("%s,%s", MetricNameLabel, MetricTypeLabel),
+	},
+	{
+		Type:   COUNTER,
+		Name:   MetricPanics,
+		Help:   "Number of panics encountered while handling metrics events",
+		Labels: fmt.Sprintf("%s,%s", MetricNameLabel, MetricTypeLabel),
 	},
 }
 

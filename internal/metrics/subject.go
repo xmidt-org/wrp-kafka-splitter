@@ -68,7 +68,7 @@ func New(m Metrics) *observe.Subject[Event] {
 
 		// If no observer handled the event, it's unknown
 		if !counterHandled && !gaugeHandled && !histogramHandled && m.UnknownMetrics != nil {
-			m.UnknownMetrics.With("metric_name", event.Name, "metric_type", "unknown").Add(1)
+			m.UnknownMetrics.With(MetricNameLabel, event.Name, MetricTypeLabel, "unknown").Add(1)
 		}
 	}
 
