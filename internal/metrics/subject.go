@@ -22,6 +22,8 @@ type Metrics struct {
 	KafkaPublished      kit.Counter
 	KafkaPublishLatency kit.Histogram
 	Panics              kit.Counter
+	UnknownMetrics      kit.Counter
+	MetricPanics        kit.Counter
 }
 
 type Metric struct {
@@ -30,32 +32,49 @@ type Metric struct {
 	histogram kit.Histogram
 }
 
-// New creates a new Subject for metric events
+// New creates a new Subject for metric events with unknown metrics tracking
 func New(m Metrics) *observe.Subject[Event] {
 	subject := observe.NewSubject[Event]()
 
-	observers := createObservers(m)
-
-	for _, observer := range observers {
-		subject.Attach(observer.HandleEvent)
+	// Create observers
+	counterMetrics := map[string]kit.Counter{
+		ConsumerFetchErrors:    m.ConsumerFetchErrors,
+		ConsumerCommitErrors:   m.ConsumerCommitErrors,
+		BucketKeyErrorCount:    m.BucketKeyErrorCount,
+		PublisherOutcomes:      m.PublisherOutcomes,
+		PublisherErrorsCounter: m.PublisherErrorsCounter,
+		KafkaPublished:         m.KafkaPublished,
+		Panics:                 m.Panics,
 	}
+
+	gaugeMetrics := map[string]kit.Gauge{
+		ConsumerPauses: m.ConsumerPauses,
+	}
+
+	histogramMetrics := map[string]kit.Histogram{
+		KafkaPublishLatency: m.KafkaPublishLatency,
+	}
+
+	counterObserver := NewCounterObserver(counterMetrics, m.MetricPanics)
+	gaugeObserver := NewGaugeObserver(gaugeMetrics, m.MetricPanics)
+	histogramObserver := NewHistogramObserver(histogramMetrics, m.MetricPanics)
+
+	// Create a handler that calls all observers and tracks unknown metrics
+	handleEvent := func(event Event) {
+		// Call all observers and collect their results
+		counterHandled := counterObserver.HandleEvent(event)
+		gaugeHandled := gaugeObserver.HandleEvent(event)
+		histogramHandled := histogramObserver.HandleEvent(event)
+
+		// If no observer handled the event, it's unknown
+		if !counterHandled && !gaugeHandled && !histogramHandled && m.UnknownMetrics != nil {
+			m.UnknownMetrics.With(MetricNameLabel, event.Name, MetricTypeLabel, "unknown").Add(1)
+		}
+	}
+
+	subject.Attach(handleEvent)
 
 	return subject
-}
-
-func createObservers(m Metrics) []*Observer {
-	observers := []*Observer{
-		NewObserver(ConsumerFetchErrors, COUNTER, Metric{counter: m.ConsumerFetchErrors}),
-		NewObserver(ConsumerCommitErrors, COUNTER, Metric{counter: m.ConsumerCommitErrors}),
-		NewObserver(ConsumerPauses, GAUGE, Metric{gauge: m.ConsumerPauses}),
-		NewObserver(BucketKeyErrorCount, COUNTER, Metric{counter: m.BucketKeyErrorCount}),
-		NewObserver(PublisherOutcomes, COUNTER, Metric{counter: m.PublisherOutcomes}),
-		NewObserver(PublisherErrorsCounter, COUNTER, Metric{counter: m.PublisherErrorsCounter}),
-		NewObserver(KafkaPublished, COUNTER, Metric{counter: m.KafkaPublished}),
-		NewObserver(KafkaPublishLatency, HISTOGRAM, Metric{histogram: m.KafkaPublishLatency}),
-		NewObserver(Panics, COUNTER, Metric{counter: m.Panics}),
-	}
-	return observers
 }
 
 func NewNoop() *observe.Subject[Event] {
