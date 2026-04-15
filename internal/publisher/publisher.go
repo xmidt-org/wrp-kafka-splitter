@@ -84,6 +84,7 @@ func New(opts ...Option) (*KafkaPublisher, error) {
 		InitialPublishEventListeners: publisher.config.publishEventListeners,
 		PrometheusNamespace:          publisher.config.prometheusNamespace,
 		PrometheusSubsystem:          publisher.config.prometheusSubsystem,
+		PrometheusRegisterer:         publisher.config.prometheusRegisterer,
 	}
 
 	publisher.wrpPublisher = wrpPublisher

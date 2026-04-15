@@ -185,7 +185,7 @@ func (suite *PublisherTestSuite) TestNew() {
 			options: []Option{
 				WithBrokers(testBroker),
 				WithTopicRoutes(wrpkafka.TopicRoute{Topic: "test", Pattern: ".*"}),
-				WithPrometheusMetrics("xmidt", "splitter"),
+				WithPrometheusMetrics("xmidt", "splitter", nil),
 			},
 			expectError: false,
 			description: "Should create publisher with Prometheus metrics configuration",
@@ -195,7 +195,7 @@ func (suite *PublisherTestSuite) TestNew() {
 			options: []Option{
 				WithBrokers(testBroker),
 				WithTopicRoutes(wrpkafka.TopicRoute{Topic: "test", Pattern: ".*"}),
-				WithPrometheusMetrics("", ""),
+				WithPrometheusMetrics("", "", nil),
 			},
 			expectError: false,
 			description: "Should create publisher with empty Prometheus namespace and subsystem",
@@ -273,7 +273,7 @@ func (suite *PublisherTestSuite) TestPrometheusMetricsConfiguration() {
 			publisher, err := New(
 				WithBrokers(testBroker),
 				WithTopicRoutes(wrpkafka.TopicRoute{Topic: "test", Pattern: ".*"}),
-				WithPrometheusMetrics(tt.namespace, tt.subsystem),
+				WithPrometheusMetrics(tt.namespace, tt.subsystem, nil),
 			)
 
 			suite.NoError(err, tt.description)

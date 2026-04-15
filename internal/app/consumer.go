@@ -57,7 +57,7 @@ func provideConsumer(in ConsumerIn) (ConsumerOut, error) {
 	opts := []consumer.Option{
 		// Observability
 		consumer.WithLogEmitter(in.LogEmitter),
-		consumer.WithPrometheusMetrics(in.PrometheusConfig.DefaultNamespace, in.PrometheusConfig.DefaultSubsystem, in.PrometheusRegisterer),
+		consumer.WithPrometheusMetrics(in.PrometheusConfig.DefaultNamespace, in.PrometheusConfig.DefaultSubsystem+"_consumer", in.PrometheusRegisterer),
 		consumer.WithMetricsEmitter(in.MetricEmitter),
 
 		// Required options

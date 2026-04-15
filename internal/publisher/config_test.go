@@ -485,7 +485,7 @@ func (suite *OptionsTestSuite) TestOptions() {
 		},
 		{
 			name:   "WithPrometheusMetrics_both_values",
-			option: WithPrometheusMetrics("xmidt", "splitter"),
+			option: WithPrometheusMetrics("xmidt", "splitter", nil),
 			setupPub: func() *KafkaPublisher {
 				return &KafkaPublisher{config: &publisherConfig{}}
 			},
@@ -497,7 +497,7 @@ func (suite *OptionsTestSuite) TestOptions() {
 		},
 		{
 			name:   "WithPrometheusMetrics_empty_values",
-			option: WithPrometheusMetrics("", ""),
+			option: WithPrometheusMetrics("", "", nil),
 			setupPub: func() *KafkaPublisher {
 				return &KafkaPublisher{config: &publisherConfig{}}
 			},
@@ -509,7 +509,7 @@ func (suite *OptionsTestSuite) TestOptions() {
 		},
 		{
 			name:   "WithPrometheusMetrics_namespace_only",
-			option: WithPrometheusMetrics("monitoring", ""),
+			option: WithPrometheusMetrics("monitoring", "", nil),
 			setupPub: func() *KafkaPublisher {
 				return &KafkaPublisher{config: &publisherConfig{}}
 			},
@@ -521,7 +521,7 @@ func (suite *OptionsTestSuite) TestOptions() {
 		},
 		{
 			name:   "WithPrometheusMetrics_subsystem_only",
-			option: WithPrometheusMetrics("", "kafka"),
+			option: WithPrometheusMetrics("", "kafka", nil),
 			setupPub: func() *KafkaPublisher {
 				return &KafkaPublisher{config: &publisherConfig{}}
 			},

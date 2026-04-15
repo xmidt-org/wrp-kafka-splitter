@@ -11,6 +11,7 @@ import (
 	"xmidt-org/splitter/internal/observe"
 	"xmidt-org/splitter/internal/publisher"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/xmidt-org/touchstone"
 	"go.uber.org/fx"
 )
@@ -18,10 +19,11 @@ import (
 // PublisherIn contains the dependencies needed to create a publisher instance.
 type PublisherIn struct {
 	fx.In
-	Config           publisher.Config
-	LogEmitter       *observe.Subject[log.Event]
-	MetricEmitter    *observe.Subject[metrics.Event]
-	PrometheusConfig touchstone.Config
+	Config               publisher.Config
+	LogEmitter           *observe.Subject[log.Event]
+	MetricEmitter        *observe.Subject[metrics.Event]
+	PrometheusConfig     touchstone.Config
+	PrometheusRegisterer prometheus.Registerer
 }
 
 // PublisherOut contains the created publisher instance.
@@ -66,7 +68,7 @@ func providePublisher(in PublisherIn) (PublisherOut, error) {
 		publisher.WithTLSConfig(cfg.TLS),
 
 		// configure franz-go to emit prometheus metrics with the provided namespace and subsystem
-		publisher.WithPrometheusMetrics(prometheusCfg.DefaultNamespace, prometheusCfg.DefaultSubsystem),
+		publisher.WithPrometheusMetrics(prometheusCfg.DefaultNamespace, prometheusCfg.DefaultSubsystem+"_publisher", in.PrometheusRegisterer),
 	}
 
 	// Create the publisher
