@@ -52,6 +52,9 @@ func ObservabilityModule() fx.Option {
 		),
 
 		// Prometheus metrics setup
+		// touchstone.Provide() creates a prometheus.Registry and provides it as both
+		// *touchstone.Factory and prometheus.Registerer, which allows franz-go to
+		// register metrics in the same registry used by touchstone
 		fx.Provide(
 			goschtalt.UnmarshalFunc[touchstone.Config]("prometheus"),
 			goschtalt.UnmarshalFunc[touchhttp.Config]("prometheus_handler"),

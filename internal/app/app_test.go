@@ -24,6 +24,7 @@ import (
 	_ "github.com/goschtalt/goschtalt/pkg/typical"
 	_ "github.com/goschtalt/yaml-decoder"
 	_ "github.com/goschtalt/yaml-encoder"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -564,10 +565,11 @@ func TestProvideConsumer(t *testing.T) {
 						DefaultNamespace: "xmidt",
 						DefaultSubsystem: "test",
 					},
-					Publisher:     createValidKafkaPublisher(),
-					LogEmitter:    logEmitter,
-					MetricEmitter: metricEmitter,
-					Buckets:       createValidBucket(),
+					PrometheusRegisterer: prometheus.NewRegistry(),
+					Publisher:            createValidKafkaPublisher(),
+					LogEmitter:           logEmitter,
+					MetricEmitter:        metricEmitter,
+					Buckets:              createValidBucket(),
 				}
 			},
 			expectError: false,
@@ -590,10 +592,11 @@ func TestProvideConsumer(t *testing.T) {
 						DefaultNamespace: "xmidt",
 						DefaultSubsystem: "test",
 					},
-					Publisher:     createValidKafkaPublisher(),
-					LogEmitter:    logEmitter,
-					MetricEmitter: metricEmitter,
-					Buckets:       createValidBucket(),
+					PrometheusRegisterer: prometheus.NewRegistry(),
+					Publisher:            createValidKafkaPublisher(),
+					LogEmitter:           logEmitter,
+					MetricEmitter:        metricEmitter,
+					Buckets:              createValidBucket(),
 				}
 			},
 			expectError: true,

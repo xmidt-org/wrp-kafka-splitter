@@ -562,7 +562,7 @@ func (s *OptionsTestSuite) TestWithLogEmitter_Nil() {
 
 func (s *OptionsTestSuite) TestWithPrometheusMetrics() {
 	consumer, err := s.createTestConsumer(
-		WithPrometheusMetrics("test_namespace", "test_subsystem"),
+		WithPrometheusMetrics("test_namespace", "test_subsystem", nil),
 	)
 	s.NoError(err)
 	s.NotNil(consumer)
@@ -571,7 +571,7 @@ func (s *OptionsTestSuite) TestWithPrometheusMetrics() {
 
 func (s *OptionsTestSuite) TestWithPrometheusMetrics_EmptyNamespace() {
 	consumer, err := s.createTestConsumer(
-		WithPrometheusMetrics("", "subsystem"),
+		WithPrometheusMetrics("", "subsystem", nil),
 	)
 	s.Error(err)
 	s.Nil(consumer)
@@ -580,7 +580,7 @@ func (s *OptionsTestSuite) TestWithPrometheusMetrics_EmptyNamespace() {
 
 func (s *OptionsTestSuite) TestWithPrometheusMetrics_EmptySubsystem() {
 	consumer, err := s.createTestConsumer(
-		WithPrometheusMetrics("namespace", ""),
+		WithPrometheusMetrics("namespace", "", nil),
 	)
 	s.Error(err)
 	s.Nil(consumer)

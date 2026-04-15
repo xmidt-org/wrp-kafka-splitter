@@ -16,6 +16,7 @@ import (
 	"xmidt-org/splitter/internal/metrics"
 	"xmidt-org/splitter/internal/observe"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/sasl/plain"
 	"github.com/twmb/franz-go/pkg/sasl/scram"
@@ -432,7 +433,13 @@ func (s *slogAdapter) Log(level kgo.LogLevel, msg string, keyvals ...interface{}
 
 // WithPrometheusMetrics configures franz-go to emit Prometheus metrics.
 // This uses the kprom plugin to register metrics with the provided namespace and subsystem.
-// Metrics will be automatically registered with the default Prometheus registry.
+// The registerer parameter allows you to specify which Prometheus registry to use.
+// If registerer is nil, metrics will be registered with the default Prometheus registry.
+//
+// IMPORTANT: If your application uses touchstone or a custom Prometheus registry,
+// you must pass that registry's Registerer to ensure metrics appear in your
+// metrics endpoint. Otherwise, metrics will be registered with the global registry
+// and won't be scraped.
 //
 // Example metrics exposed:
 //   - {namespace}_{subsystem}_records_consumed_total
@@ -442,7 +449,7 @@ func (s *slogAdapter) Log(level kgo.LogLevel, msg string, keyvals ...interface{}
 //   - And many more...
 //
 // For full list of metrics, see: https://pkg.go.dev/github.com/twmb/franz-go/plugin/kprom
-func WithPrometheusMetrics(namespace, subsystem string) Option {
+func WithPrometheusMetrics(namespace, subsystem string, registerer prometheus.Registerer) Option {
 	return optionFunc(func(c *KafkaConsumer) error {
 		if namespace == "" {
 			return fmt.Errorf("metrics namespace cannot be empty")
@@ -452,11 +459,18 @@ func WithPrometheusMetrics(namespace, subsystem string) Option {
 			return fmt.Errorf("metrics subsystem cannot be empty")
 		}
 
-		// Create kprom metrics with the specified namespace and subsystem
-		metrics := kprom.NewMetrics(
-			namespace,
+		// Build kprom options
+		kpromOpts := []kprom.Opt{
 			kprom.Subsystem(subsystem),
-		)
+		}
+
+		// If a custom registerer is provided, use it instead of the default
+		if registerer != nil {
+			kpromOpts = append(kpromOpts, kprom.Registerer(registerer))
+		}
+
+		// Create kprom metrics with the specified namespace and subsystem
+		metrics := kprom.NewMetrics(namespace, kpromOpts...)
 
 		// Add the metrics hook to the consumer
 		c.config.kgoOpts = append(c.config.kgoOpts, kgo.WithHooks(metrics))
