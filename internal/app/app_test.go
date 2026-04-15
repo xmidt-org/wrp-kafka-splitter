@@ -302,6 +302,7 @@ func TestProvidePublisher(t *testing.T) {
 		setupConfig func() PublisherIn
 		expectError bool
 		description string
+		verify      func(*testing.T, PublisherOut)
 	}{
 		{
 			name: "Success",
@@ -333,10 +334,92 @@ func TestProvidePublisher(t *testing.T) {
 					},
 					LogEmitter:    logEmitter,
 					MetricEmitter: metricEmitter,
+					PrometheusConfig: touchstone.Config{
+						DefaultNamespace: "xmidt",
+						DefaultSubsystem: "splitter",
+					},
 				}
 			},
 			expectError: false,
 			description: "providePublisher should succeed with valid config",
+			verify: func(t *testing.T, out PublisherOut) {
+				assert.NotNil(t, out.Publisher, "Should return a valid publisher instance")
+			},
+		},
+		{
+			name: "Success_WithPrometheusConfig",
+			setupConfig: func() PublisherIn {
+				logEmitter := observe.NewSubject[log.Event]()
+				metricEmitter := observe.NewSubject[metrics.Event]()
+
+				return PublisherIn{
+					Config: publisher.Config{
+						Brokers: publisher.Brokers{
+							RestartOnConfigChange: false,
+							TargetRegion:          "us-east-1",
+							Regions: map[string][]string{
+								"us-east-1": {"localhost:9092"},
+							},
+						},
+						TopicRoutes: []publisher.TopicRoute{
+							{
+								Topic:   "wrp-events",
+								Pattern: "*",
+							},
+						},
+					},
+					LogEmitter:    logEmitter,
+					MetricEmitter: metricEmitter,
+					PrometheusConfig: touchstone.Config{
+						DefaultNamespace: "test_namespace",
+						DefaultSubsystem: "test_subsystem",
+					},
+				}
+			},
+			expectError: false,
+			description: "providePublisher should properly pass Prometheus config to publisher",
+			verify: func(t *testing.T, out PublisherOut) {
+				assert.NotNil(t, out.Publisher, "Should return a valid publisher instance")
+				// Publisher creation succeeds when prometheus config is provided
+				// Detailed prometheus config verification is handled by publisher package tests
+			},
+		},
+		{
+			name: "Success_WithEmptyPrometheusConfig",
+			setupConfig: func() PublisherIn {
+				logEmitter := observe.NewSubject[log.Event]()
+				metricEmitter := observe.NewSubject[metrics.Event]()
+
+				return PublisherIn{
+					Config: publisher.Config{
+						Brokers: publisher.Brokers{
+							RestartOnConfigChange: false,
+							TargetRegion:          "us-east-1",
+							Regions: map[string][]string{
+								"us-east-1": {"localhost:9092"},
+							},
+						},
+						TopicRoutes: []publisher.TopicRoute{
+							{
+								Topic:   "wrp-events",
+								Pattern: "*",
+							},
+						},
+					},
+					LogEmitter:    logEmitter,
+					MetricEmitter: metricEmitter,
+					PrometheusConfig: touchstone.Config{
+						DefaultNamespace: "",
+						DefaultSubsystem: "",
+					},
+				}
+			},
+			expectError: false,
+			description: "providePublisher should succeed with empty Prometheus config",
+			verify: func(t *testing.T, out PublisherOut) {
+				assert.NotNil(t, out.Publisher, "Should return a valid publisher instance")
+				// Publisher creation succeeds when prometheus config is provided, even if empty
+			},
 		},
 		{
 			name: "InvalidConfig",
@@ -362,6 +445,10 @@ func TestProvidePublisher(t *testing.T) {
 					},
 					LogEmitter:    logEmitter,
 					MetricEmitter: metricEmitter,
+					PrometheusConfig: touchstone.Config{
+						DefaultNamespace: "xmidt",
+						DefaultSubsystem: "splitter",
+					},
 				}
 			},
 			expectError: true,
@@ -384,7 +471,9 @@ func TestProvidePublisher(t *testing.T) {
 				assert.Contains(t, err.Error(), "failed to create publisher", "Error should indicate publisher creation failure")
 			} else {
 				assert.NoError(t, err, tc.description)
-				assert.NotNil(t, out.Publisher, "Should return a valid publisher instance")
+				if tc.verify != nil {
+					tc.verify(t, out)
+				}
 			}
 		})
 	}

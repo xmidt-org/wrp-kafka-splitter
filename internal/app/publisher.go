@@ -11,15 +11,17 @@ import (
 	"xmidt-org/splitter/internal/observe"
 	"xmidt-org/splitter/internal/publisher"
 
+	"github.com/xmidt-org/touchstone"
 	"go.uber.org/fx"
 )
 
 // PublisherIn contains the dependencies needed to create a publisher instance.
 type PublisherIn struct {
 	fx.In
-	Config        publisher.Config
-	LogEmitter    *observe.Subject[log.Event]
-	MetricEmitter *observe.Subject[metrics.Event]
+	Config           publisher.Config
+	LogEmitter       *observe.Subject[log.Event]
+	MetricEmitter    *observe.Subject[metrics.Event]
+	PrometheusConfig touchstone.Config
 }
 
 // PublisherOut contains the created publisher instance.
@@ -31,6 +33,7 @@ type PublisherOut struct {
 // providePublisher creates a new Kafka publisher instance with options from the config file
 func providePublisher(in PublisherIn) (PublisherOut, error) {
 	cfg := in.Config
+	prometheusCfg := in.PrometheusConfig
 
 	// Convert config routes to wrpkafka routes
 	wrpRoutes, err := cfg.ToWRPKafkaRoutes()
@@ -61,6 +64,9 @@ func providePublisher(in PublisherIn) (PublisherOut, error) {
 
 		// TLS configuration (uses config-aware wrapper)
 		publisher.WithTLSConfig(cfg.TLS),
+
+		// configure franz-go to emit prometheus metrics with the provided namespace and subsystem
+		publisher.WithPrometheusMetrics(prometheusCfg.DefaultNamespace, prometheusCfg.DefaultSubsystem),
 	}
 
 	// Create the publisher

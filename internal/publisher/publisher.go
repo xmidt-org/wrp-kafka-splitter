@@ -82,6 +82,8 @@ func New(opts ...Option) (*KafkaPublisher, error) {
 		AllowAutoTopicCreation:       publisher.config.allowAutoTopicCreation,
 		Logger:                       publisher.config.logger,
 		InitialPublishEventListeners: publisher.config.publishEventListeners,
+		PrometheusNamespace:          publisher.config.prometheusNamespace,
+		PrometheusSubsystem:          publisher.config.prometheusSubsystem,
 	}
 
 	publisher.wrpPublisher = wrpPublisher
