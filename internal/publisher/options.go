@@ -57,6 +57,8 @@ type publisherConfig struct {
 	allowAutoTopicCreation bool
 	logger                 kgo.Logger
 	publishEventListeners  []func(*wrpkafka.PublishEvent)
+	prometheusNamespace    string
+	prometheusSubsystem    string
 }
 
 // validate ensures all required configuration is present.
@@ -304,4 +306,12 @@ func WithSASLScram512(username, password string) Option {
 // WithTLS enables TLS with default settings (convenience method).
 func WithTLS() Option {
 	return WithTLSConfig(&TLSConfig{Enabled: true})
+}
+
+func WithPrometheusMetrics(namespace, subsystem string) Option {
+	return optionFunc(func(p *KafkaPublisher) error {
+		p.config.prometheusNamespace = namespace
+		p.config.prometheusSubsystem = subsystem
+		return nil
+	})
 }

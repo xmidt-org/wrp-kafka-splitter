@@ -26,12 +26,6 @@ type Metrics struct {
 	MetricPanics        kit.Counter
 }
 
-type Metric struct {
-	counter   kit.Counter
-	gauge     kit.Gauge
-	histogram kit.Histogram
-}
-
 // New creates a new Subject for metric events with unknown metrics tracking
 func New(m Metrics) *observe.Subject[Event] {
 	subject := observe.NewSubject[Event]()

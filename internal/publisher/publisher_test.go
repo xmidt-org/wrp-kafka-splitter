@@ -180,6 +180,26 @@ func (suite *PublisherTestSuite) TestNew() {
 			expectError: false,
 			description: "Should create publisher with custom TLS config",
 		},
+		{
+			name: "with_prometheus_metrics",
+			options: []Option{
+				WithBrokers(testBroker),
+				WithTopicRoutes(wrpkafka.TopicRoute{Topic: "test", Pattern: ".*"}),
+				WithPrometheusMetrics("xmidt", "splitter"),
+			},
+			expectError: false,
+			description: "Should create publisher with Prometheus metrics configuration",
+		},
+		{
+			name: "with_prometheus_empty_values",
+			options: []Option{
+				WithBrokers(testBroker),
+				WithTopicRoutes(wrpkafka.TopicRoute{Topic: "test", Pattern: ".*"}),
+				WithPrometheusMetrics("", ""),
+			},
+			expectError: false,
+			description: "Should create publisher with empty Prometheus namespace and subsystem",
+		},
 	}
 
 	for _, tt := range tests {
@@ -200,6 +220,69 @@ func (suite *PublisherTestSuite) TestNew() {
 				suite.NotNil(publisher.metricEmitter)
 				suite.False(publisher.started)
 			}
+		})
+	}
+}
+
+// Test Prometheus metrics configuration
+func (suite *PublisherTestSuite) TestPrometheusMetricsConfiguration() {
+	tests := []struct {
+		name              string
+		namespace         string
+		subsystem         string
+		expectedNamespace string
+		expectedSubsystem string
+		description       string
+	}{
+		{
+			name:              "valid_namespace_and_subsystem",
+			namespace:         "xmidt",
+			subsystem:         "splitter",
+			expectedNamespace: "xmidt",
+			expectedSubsystem: "splitter",
+			description:       "Should configure Prometheus with valid namespace and subsystem",
+		},
+		{
+			name:              "empty_namespace_and_subsystem",
+			namespace:         "",
+			subsystem:         "",
+			expectedNamespace: "",
+			expectedSubsystem: "",
+			description:       "Should handle empty namespace and subsystem",
+		},
+		{
+			name:              "namespace_only",
+			namespace:         "monitoring",
+			subsystem:         "",
+			expectedNamespace: "monitoring",
+			expectedSubsystem: "",
+			description:       "Should configure with namespace but no subsystem",
+		},
+		{
+			name:              "subsystem_only",
+			namespace:         "",
+			subsystem:         "kafka_publisher",
+			expectedNamespace: "",
+			expectedSubsystem: "kafka_publisher",
+			description:       "Should configure with subsystem but no namespace",
+		},
+	}
+
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+			publisher, err := New(
+				WithBrokers(testBroker),
+				WithTopicRoutes(wrpkafka.TopicRoute{Topic: "test", Pattern: ".*"}),
+				WithPrometheusMetrics(tt.namespace, tt.subsystem),
+			)
+
+			suite.NoError(err, tt.description)
+			suite.NotNil(publisher, "Publisher should be created")
+			suite.NotNil(publisher.wrpPublisher, "WRP publisher should be initialized")
+
+			// Verify that the Prometheus configuration was passed to the underlying wrpkafka.Publisher
+			suite.Equal(tt.expectedNamespace, publisher.wrpPublisher.PrometheusNamespace, "Prometheus namespace should match")
+			suite.Equal(tt.expectedSubsystem, publisher.wrpPublisher.PrometheusSubsystem, "Prometheus subsystem should match")
 		})
 	}
 }
