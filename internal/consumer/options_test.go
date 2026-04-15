@@ -16,6 +16,7 @@ import (
 	"xmidt-org/splitter/internal/metrics"
 
 	kit "github.com/go-kit/kit/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/suite"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
@@ -585,6 +586,18 @@ func (s *OptionsTestSuite) TestWithPrometheusMetrics_EmptySubsystem() {
 	s.Error(err)
 	s.Nil(consumer)
 	s.Contains(err.Error(), "subsystem cannot be empty")
+}
+
+func (s *OptionsTestSuite) TestWithPrometheusMetrics_CustomRegistry() {
+	// Create a custom prometheus registry
+	customRegistry := prometheus.NewRegistry()
+
+	consumer, err := s.createTestConsumer(
+		WithPrometheusMetrics("custom_namespace", "custom_subsystem", customRegistry),
+	)
+	s.NoError(err)
+	s.NotNil(consumer)
+	s.NotEmpty(consumer.config.kgoOpts)
 }
 
 func (s *OptionsTestSuite) TestWithMetricsEmitter() {
