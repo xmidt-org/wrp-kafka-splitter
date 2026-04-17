@@ -58,9 +58,7 @@ type publisherConfig struct {
 	allowAutoTopicCreation bool
 	logger                 kgo.Logger
 	publishEventListeners  []func(*wrpkafka.PublishEvent)
-	prometheusNamespace    string
-	prometheusSubsystem    string
-	prometheusRegisterer   prometheus.Registerer
+	prometheus             *PrometheusConfig
 }
 
 // validate ensures all required configuration is present.
@@ -310,11 +308,23 @@ func WithTLS() Option {
 	return WithTLSConfig(&TLSConfig{Enabled: true})
 }
 
-func WithPrometheusMetrics(namespace, subsystem string, registerer prometheus.Registerer) Option {
+// WithPrometheusConfig configures Prometheus metrics for the publisher.
+// This consolidates all prometheus settings into a single struct.
+func WithPrometheusConfig(config *PrometheusConfig) Option {
 	return optionFunc(func(p *KafkaPublisher) error {
-		p.config.prometheusNamespace = namespace
-		p.config.prometheusSubsystem = subsystem
-		p.config.prometheusRegisterer = registerer
+		if config != nil {
+			p.config.prometheus = config
+		}
 		return nil
+	})
+}
+
+// WithPrometheusMetrics configures Prometheus metrics with basic settings.
+// For more control over individual metrics, use WithPrometheusConfig instead.
+func WithPrometheusMetrics(namespace, subsystem string, registerer prometheus.Registerer) Option {
+	return WithPrometheusConfig(&PrometheusConfig{
+		Namespace:  namespace,
+		Subsystem:  subsystem,
+		Registerer: registerer,
 	})
 }

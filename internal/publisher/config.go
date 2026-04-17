@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/xmidt-org/wrpkafka"
 )
 
@@ -90,4 +91,65 @@ type TLSConfig struct {
 	CAFile             string `yaml:"ca_file,omitempty"`
 	CertFile           string `yaml:"cert_file,omitempty"`
 	KeyFile            string `yaml:"key_file,omitempty"`
+}
+
+// PrometheusConfig represents Prometheus metrics configuration for the publisher.
+// This includes both franz-go metrics and application-level metrics.
+type PrometheusConfig struct {
+	// Namespace is the prometheus namespace for metrics (e.g., "xmidt")
+	Namespace string `yaml:"namespace,omitempty"`
+
+	// Subsystem is the prometheus subsystem name (e.g., "splitter")
+	Subsystem string `yaml:"subsystem,omitempty"`
+
+	// Registerer is the prometheus registerer to use for metrics.
+	// If nil, metrics will be registered with the default prometheus registry.
+	// This field is typically set programmatically, not via YAML.
+	Registerer prometheus.Registerer `yaml:"-"`
+
+	// Franz-go specific prometheus metrics options
+	EnableRecordMetrics   bool `yaml:"enable_record_metrics,omitempty"`
+	EnableBatchMetrics    bool `yaml:"enable_batch_metrics,omitempty"`
+	EnableCompressedBytes bool `yaml:"enable_compressed_bytes,omitempty"`
+	EnableGoCollectors    bool `yaml:"enable_go_collectors,omitempty"`
+	WithClientLabel       bool `yaml:"with_client_label,omitempty"`
+
+	// Application-level metric controls for splitter
+	// These control metrics emitted by the splitter itself, not franz-go
+
+	// EnableBufferUtilization controls whether to expose the buffer utilization gauge metric.
+	// Default: true
+	EnableBufferUtilization *bool `yaml:"enable_buffer_utilization,omitempty"`
+
+	// EnablePublishCounter controls whether to expose the messages published counter metric.
+	// Default: true
+	EnablePublishCounter *bool `yaml:"enable_publish_counter,omitempty"`
+
+	// EnablePublishLatency controls whether to expose the publish latency histogram metric.
+	// Default: true
+	EnablePublishLatency *bool `yaml:"enable_publish_latency,omitempty"`
+}
+
+// IsBufferUtilizationEnabled returns true if buffer utilization metric should be enabled.
+func (p *PrometheusConfig) IsBufferUtilizationEnabled() bool {
+	if p == nil || p.EnableBufferUtilization == nil {
+		return true // default enabled
+	}
+	return *p.EnableBufferUtilization
+}
+
+// IsPublishCounterEnabled returns true if publish counter metric should be enabled.
+func (p *PrometheusConfig) IsPublishCounterEnabled() bool {
+	if p == nil || p.EnablePublishCounter == nil {
+		return true // default enabled
+	}
+	return *p.EnablePublishCounter
+}
+
+// IsPublishLatencyEnabled returns true if publish latency metric should be enabled.
+func (p *PrometheusConfig) IsPublishLatencyEnabled() bool {
+	if p == nil || p.EnablePublishLatency == nil {
+		return true // default enabled
+	}
+	return *p.EnablePublishLatency
 }

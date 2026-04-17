@@ -82,14 +82,32 @@ func New(opts ...Option) (*KafkaPublisher, error) {
 		AllowAutoTopicCreation:       publisher.config.allowAutoTopicCreation,
 		Logger:                       publisher.config.logger,
 		InitialPublishEventListeners: publisher.config.publishEventListeners,
-		PrometheusNamespace:          publisher.config.prometheusNamespace,
-		PrometheusSubsystem:          publisher.config.prometheusSubsystem,
-		PrometheusRegisterer:         publisher.config.prometheusRegisterer,
+		Prometheus:                   publisher.toWRPKafkaPrometheusConfig(),
 	}
 
 	publisher.wrpPublisher = wrpPublisher
 
 	return publisher, nil
+}
+
+// toWRPKafkaPrometheusConfig converts our PrometheusConfig to wrpkafka.PrometheusConfig.
+func (p *KafkaPublisher) toWRPKafkaPrometheusConfig() wrpkafka.PrometheusConfig {
+	if p.config.prometheus == nil {
+		return wrpkafka.PrometheusConfig{}
+	}
+
+	cfg := wrpkafka.PrometheusConfig{
+		Namespace:             p.config.prometheus.Namespace,
+		Subsystem:             p.config.prometheus.Subsystem,
+		Registerer:            p.config.prometheus.Registerer,
+		EnableRecordMetrics:   p.config.prometheus.EnableRecordMetrics,
+		EnableBatchMetrics:    p.config.prometheus.EnableBatchMetrics,
+		EnableCompressedBytes: p.config.prometheus.EnableCompressedBytes,
+		EnableGoCollectors:    p.config.prometheus.EnableGoCollectors,
+		WithClientLabel:       p.config.prometheus.WithClientLabel,
+	}
+
+	return cfg
 }
 
 // Start initializes and starts the publisher.
@@ -110,42 +128,47 @@ func (p *KafkaPublisher) Start() error {
 	// Add event listener for all publish events (success and failure)
 	p.wrpPublisher.AddPublishEventListener(func(event *wrpkafka.PublishEvent) {
 
-		errorType := "success"
-		if event.Error != nil {
-			errorType = event.ErrorType
-		}
+		// Only emit metrics if the respective metric is enabled
+		if p.config.prometheus != nil && p.config.prometheus.IsPublishCounterEnabled() {
+			errorType := "success"
+			if event.Error != nil {
+				errorType = event.ErrorType
+			}
 
-		labels := []string{
-			metrics.TopicLabel, event.Topic,
-			metrics.TopicShardStrategyLabel, event.TopicShardStrategy,
-			metrics.ErrorTypeLabel, errorType,
-		}
-
-		p.metricEmitter.Notify(metrics.Event{
-			Name:   metrics.KafkaPublished,
-			Value:  1,
-			Labels: labels,
-		})
-
-		// Record latency for all events
-		p.metricEmitter.Notify(metrics.Event{
-			Name:  metrics.KafkaPublishLatency,
-			Value: event.Duration.Seconds(),
-			Labels: []string{
+			labels := []string{
 				metrics.TopicLabel, event.Topic,
-				metrics.ErrorTypeLabel, func() string {
-					if event.Error != nil {
-						return event.ErrorType
-					}
-					return "none"
-				}(),
-			},
-		})
+				metrics.TopicShardStrategyLabel, event.TopicShardStrategy,
+				metrics.ErrorTypeLabel, errorType,
+			}
+
+			p.metricEmitter.Notify(metrics.Event{
+				Name:   metrics.KafkaPublished,
+				Value:  1,
+				Labels: labels,
+			})
+		}
+
+		// Record latency for all events if enabled
+		if p.config.prometheus != nil && p.config.prometheus.IsPublishLatencyEnabled() {
+			p.metricEmitter.Notify(metrics.Event{
+				Name:  metrics.KafkaPublishLatency,
+				Value: event.Duration.Seconds(),
+				Labels: []string{
+					metrics.TopicLabel, event.Topic,
+					metrics.ErrorTypeLabel, func() string {
+						if event.Error != nil {
+							return event.ErrorType
+						}
+						return "none"
+					}(),
+				},
+			})
+		}
 
 	})
 
 	// Set up buffer utilization function for automatic Prometheus scraping
-	if p.config.maxBufferedRecords > 0 {
+	if p.config.maxBufferedRecords > 0 && p.config.prometheus != nil && p.config.prometheus.IsBufferUtilizationEnabled() {
 		metrics.BufferUtilization = p.wrpPublisher.BufferedRecords
 	}
 
@@ -173,7 +196,7 @@ func (p *KafkaPublisher) Stop(ctx context.Context) error {
 	}
 
 	// Clear the buffer utilization function
-	if p.config.maxBufferedRecords > 0 {
+	if p.config.maxBufferedRecords > 0 && p.config.prometheus != nil && p.config.prometheus.IsBufferUtilizationEnabled() {
 		metrics.BufferUtilization = nil
 	}
 

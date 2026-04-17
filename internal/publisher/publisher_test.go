@@ -281,8 +281,8 @@ func (suite *PublisherTestSuite) TestPrometheusMetricsConfiguration() {
 			suite.NotNil(publisher.wrpPublisher, "WRP publisher should be initialized")
 
 			// Verify that the Prometheus configuration was passed to the underlying wrpkafka.Publisher
-			suite.Equal(tt.expectedNamespace, publisher.wrpPublisher.PrometheusNamespace, "Prometheus namespace should match")
-			suite.Equal(tt.expectedSubsystem, publisher.wrpPublisher.PrometheusSubsystem, "Prometheus subsystem should match")
+			suite.Equal(tt.expectedNamespace, publisher.wrpPublisher.Prometheus.Namespace, "Prometheus namespace should match")
+			suite.Equal(tt.expectedSubsystem, publisher.wrpPublisher.Prometheus.Subsystem, "Prometheus subsystem should match")
 		})
 	}
 }

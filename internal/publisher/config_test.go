@@ -490,8 +490,9 @@ func (suite *OptionsTestSuite) TestOptions() {
 				return &KafkaPublisher{config: &publisherConfig{}}
 			},
 			verifyPub: func(p *KafkaPublisher) {
-				suite.Equal("xmidt", p.config.prometheusNamespace)
-				suite.Equal("splitter", p.config.prometheusSubsystem)
+				suite.NotNil(p.config.prometheus)
+				suite.Equal("xmidt", p.config.prometheus.Namespace)
+				suite.Equal("splitter", p.config.prometheus.Subsystem)
 			},
 			description: "Should set Prometheus namespace and subsystem correctly",
 		},
@@ -502,8 +503,9 @@ func (suite *OptionsTestSuite) TestOptions() {
 				return &KafkaPublisher{config: &publisherConfig{}}
 			},
 			verifyPub: func(p *KafkaPublisher) {
-				suite.Equal("", p.config.prometheusNamespace)
-				suite.Equal("", p.config.prometheusSubsystem)
+				suite.NotNil(p.config.prometheus)
+				suite.Equal("", p.config.prometheus.Namespace)
+				suite.Equal("", p.config.prometheus.Subsystem)
 			},
 			description: "Should accept empty Prometheus namespace and subsystem",
 		},
@@ -514,8 +516,9 @@ func (suite *OptionsTestSuite) TestOptions() {
 				return &KafkaPublisher{config: &publisherConfig{}}
 			},
 			verifyPub: func(p *KafkaPublisher) {
-				suite.Equal("monitoring", p.config.prometheusNamespace)
-				suite.Equal("", p.config.prometheusSubsystem)
+				suite.NotNil(p.config.prometheus)
+				suite.Equal("monitoring", p.config.prometheus.Namespace)
+				suite.Equal("", p.config.prometheus.Subsystem)
 			},
 			description: "Should set Prometheus namespace with empty subsystem",
 		},
@@ -526,8 +529,9 @@ func (suite *OptionsTestSuite) TestOptions() {
 				return &KafkaPublisher{config: &publisherConfig{}}
 			},
 			verifyPub: func(p *KafkaPublisher) {
-				suite.Equal("", p.config.prometheusNamespace)
-				suite.Equal("kafka", p.config.prometheusSubsystem)
+				suite.NotNil(p.config.prometheus)
+				suite.Equal("", p.config.prometheus.Namespace)
+				suite.Equal("kafka", p.config.prometheus.Subsystem)
 			},
 			description: "Should set Prometheus subsystem with empty namespace",
 		},
