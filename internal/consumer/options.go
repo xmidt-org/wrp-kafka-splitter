@@ -441,12 +441,18 @@ func (s *slogAdapter) Log(level kgo.LogLevel, msg string, keyvals ...interface{}
 // metrics endpoint. Otherwise, metrics will be registered with the global registry
 // and won't be scraped.
 //
-// Example metrics exposed:
-//   - {namespace}_{subsystem}_records_consumed_total
-//   - {namespace}_{subsystem}_records_lag
-//   - {namespace}_{subsystem}_fetch_bytes_total
-//   - {namespace}_{subsystem}_buffered_fetch_records
-//   - And many more...
+// Consumer metrics exposed (with labels node_id and topic):
+//   - {namespace}_{subsystem}_fetch_bytes_total           - Total bytes fetched (counter)
+//   - {namespace}_{subsystem}_fetch_records_total         - Total records fetched (counter)
+//   - {namespace}_{subsystem}_fetch_batches_total         - Total batches fetched (counter)
+//   - {namespace}_{subsystem}_buffered_fetch_bytes        - Current bytes buffered (gauge)
+//   - {namespace}_{subsystem}_buffered_fetch_records_total - Current records buffered (gauge)
+//   - {namespace}_{subsystem}_connects_total              - Connection attempts (counter)
+//   - {namespace}_{subsystem}_read_bytes_total            - Total bytes read from network (counter)
+//   - {namespace}_{subsystem}_read_errors_total           - Read errors (counter)
+//
+// Note: buffered_* gauges show the current buffer state and will be 0 if messages
+// are processed immediately. Check the _total counters to verify the consumer is working.
 //
 // For full list of metrics, see: https://pkg.go.dev/github.com/twmb/franz-go/plugin/kprom
 func WithPrometheusMetrics(namespace, subsystem string, registerer prometheus.Registerer) Option {
@@ -462,6 +468,14 @@ func WithPrometheusMetrics(namespace, subsystem string, registerer prometheus.Re
 		// Build kprom options
 		kpromOpts := []kprom.Opt{
 			kprom.Subsystem(subsystem),
+			// Enable detailed fetch/produce metrics
+			kprom.FetchAndProduceDetail(
+				kprom.UncompressedBytes, // Track uncompressed bytes (fetch_bytes_total)
+				kprom.Records,           // Track record counts (fetch_records_total)
+				kprom.Batches,           // Track batch counts (fetch_batches_total)
+				kprom.ByNode,            // Include node_id label
+				kprom.ByTopic,           // Include topic label
+			),
 		}
 
 		// If a custom registerer is provided, use it instead of the default
