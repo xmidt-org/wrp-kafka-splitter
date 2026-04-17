@@ -67,8 +67,9 @@ func providePublisher(in PublisherIn) (PublisherOut, error) {
 		// TLS configuration (uses config-aware wrapper)
 		publisher.WithTLSConfig(cfg.TLS),
 
-		// configure franz-go to emit prometheus metrics with the provided namespace and subsystem
-		publisher.WithPrometheusMetrics(prometheusCfg.DefaultNamespace, prometheusCfg.DefaultSubsystem+"_publisher", in.PrometheusRegisterer),
+		// Configure Prometheus metrics
+		// Use config from YAML if provided, otherwise build from touchstone
+		publisher.WithPrometheusConfig(buildPrometheusConfig(cfg.Prometheus, prometheusCfg, in.PrometheusRegisterer)),
 	}
 
 	// Create the publisher
@@ -80,4 +81,27 @@ func providePublisher(in PublisherIn) (PublisherOut, error) {
 	return PublisherOut{
 		Publisher: pub,
 	}, nil
+}
+
+// buildPrometheusConfig creates a PrometheusConfig by merging YAML config with touchstone config.
+// If YAML config is provided, it takes precedence for optional metrics while namespace/subsystem
+// come from touchstone (consistent across all services).
+func buildPrometheusConfig(yamlCfg *publisher.PrometheusConfig, touchstoneCfg touchstone.Config, registerer prometheus.Registerer) *publisher.PrometheusConfig {
+	// Always use touchstone for namespace/subsystem and registerer (consistent across services)
+	cfg := &publisher.PrometheusConfig{
+		Namespace:  touchstoneCfg.DefaultNamespace,
+		Subsystem:  touchstoneCfg.DefaultSubsystem + "_publisher",
+		Registerer: registerer,
+	}
+
+	// If YAML config is provided, use it for optional franz-go metrics
+	if yamlCfg != nil {
+		cfg.EnableRecordMetrics = yamlCfg.EnableRecordMetrics
+		cfg.EnableBatchMetrics = yamlCfg.EnableBatchMetrics
+		cfg.EnableCompressedBytes = yamlCfg.EnableCompressedBytes
+		cfg.EnableGoCollectors = yamlCfg.EnableGoCollectors
+		cfg.WithClientLabel = yamlCfg.WithClientLabel
+	}
+
+	return cfg
 }

@@ -16,7 +16,6 @@ import (
 	"xmidt-org/splitter/internal/metrics"
 	"xmidt-org/splitter/internal/observe"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/sasl/plain"
 	"github.com/twmb/franz-go/pkg/sasl/scram"
@@ -431,17 +430,16 @@ func (s *slogAdapter) Log(level kgo.LogLevel, msg string, keyvals ...interface{}
 
 // Metrics and Hooks Options
 
-// WithPrometheusMetrics configures franz-go to emit Prometheus metrics.
-// This uses the kprom plugin to register metrics with the provided namespace and subsystem.
-// The registerer parameter allows you to specify which Prometheus registry to use.
-// If registerer is nil, metrics will be registered with the default Prometheus registry.
+// WithPrometheusMetrics configures franz-go to emit Prometheus metrics using kprom.
+// Accepts a PrometheusConfig struct for optional franz-go metrics configuration.
+//
+// Core metrics are ALWAYS enabled: uncompressed bytes, records, batches, node_id label, topic label.
+// Only optional franz-go metrics can be configured via the PrometheusConfig.
 //
 // IMPORTANT: If your application uses touchstone or a custom Prometheus registry,
-// you must pass that registry's Registerer to ensure metrics appear in your
-// metrics endpoint. Otherwise, metrics will be registered with the global registry
-// and won't be scraped.
+// you must set config.Registerer to ensure metrics appear in your metrics endpoint.
 //
-// Consumer metrics exposed (with labels node_id and topic):
+// Consumer metrics (always enabled):
 //   - {namespace}_{subsystem}_fetch_bytes_total           - Total bytes fetched (counter)
 //   - {namespace}_{subsystem}_fetch_records_total         - Total records fetched (counter)
 //   - {namespace}_{subsystem}_fetch_batches_total         - Total batches fetched (counter)
@@ -451,24 +449,32 @@ func (s *slogAdapter) Log(level kgo.LogLevel, msg string, keyvals ...interface{}
 //   - {namespace}_{subsystem}_read_bytes_total            - Total bytes read from network (counter)
 //   - {namespace}_{subsystem}_read_errors_total           - Read errors (counter)
 //
-// Note: buffered_* gauges show the current buffer state and will be 0 if messages
-// are processed immediately. Check the _total counters to verify the consumer is working.
+// Optional metrics (configured via PrometheusConfig):
+//   - {namespace}_{subsystem}_fetch_compressed_bytes_total - Compressed bytes (if enabled)
+//   - Go runtime metrics (goroutines, memory, etc.) - if EnableGoCollectors = true
+//
+// All core metrics include node_id and topic labels.
+// Optional client_id label can be added via config.WithClientLabel.
 //
 // For full list of metrics, see: https://pkg.go.dev/github.com/twmb/franz-go/plugin/kprom
-func WithPrometheusMetrics(namespace, subsystem string, registerer prometheus.Registerer) Option {
+func WithPrometheusMetrics(config *PrometheusConfig) Option {
 	return optionFunc(func(c *KafkaConsumer) error {
-		if namespace == "" {
+		if config == nil {
+			return nil // No metrics if config is nil
+		}
+
+		if config.Namespace == "" {
 			return fmt.Errorf("metrics namespace cannot be empty")
 		}
 
-		if subsystem == "" {
+		if config.Subsystem == "" {
 			return fmt.Errorf("metrics subsystem cannot be empty")
 		}
 
-		// Build kprom options
+		// Build kprom options based on config
 		kpromOpts := []kprom.Opt{
-			kprom.Subsystem(subsystem),
-			// Enable detailed fetch/produce metrics
+			kprom.Subsystem(config.Subsystem),
+			// Core metrics are always enabled
 			kprom.FetchAndProduceDetail(
 				kprom.UncompressedBytes, // Track uncompressed bytes (fetch_bytes_total)
 				kprom.Records,           // Track record counts (fetch_records_total)
@@ -478,13 +484,27 @@ func WithPrometheusMetrics(namespace, subsystem string, registerer prometheus.Re
 			),
 		}
 
-		// If a custom registerer is provided, use it instead of the default
-		if registerer != nil {
-			kpromOpts = append(kpromOpts, kprom.Registerer(registerer))
+		// Add optional compressed bytes if enabled
+		if config.IsCompressedBytesEnabled() {
+			kpromOpts = append(kpromOpts, kprom.FetchAndProduceDetail(kprom.CompressedBytes))
 		}
 
-		// Create kprom metrics with the specified namespace and subsystem
-		metrics := kprom.NewMetrics(namespace, kpromOpts...)
+		// Add optional features
+		if config.IsGoCollectorsEnabled() {
+			kpromOpts = append(kpromOpts, kprom.GoCollectors())
+		}
+
+		if config.IsClientLabelEnabled() {
+			kpromOpts = append(kpromOpts, kprom.WithClientLabel())
+		}
+
+		// If a custom registerer is provided, use it instead of the default
+		if config.Registerer != nil {
+			kpromOpts = append(kpromOpts, kprom.Registerer(config.Registerer))
+		}
+
+		// Create kprom metrics with the specified namespace and options
+		metrics := kprom.NewMetrics(config.Namespace, kpromOpts...)
 
 		// Add the metrics hook to the consumer
 		c.config.kgoOpts = append(c.config.kgoOpts, kgo.WithHooks(metrics))

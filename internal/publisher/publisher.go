@@ -126,49 +126,45 @@ func (p *KafkaPublisher) Start() error {
 	}))
 
 	// Add event listener for all publish events (success and failure)
+	// Application-level metrics are always enabled
 	p.wrpPublisher.AddPublishEventListener(func(event *wrpkafka.PublishEvent) {
 
-		// Only emit metrics if the respective metric is enabled
-		if p.config.prometheus != nil && p.config.prometheus.IsPublishCounterEnabled() {
-			errorType := "success"
-			if event.Error != nil {
-				errorType = event.ErrorType
-			}
+		errorType := "success"
+		if event.Error != nil {
+			errorType = event.ErrorType
+		}
 
-			labels := []string{
+		labels := []string{
+			metrics.TopicLabel, event.Topic,
+			metrics.TopicShardStrategyLabel, event.TopicShardStrategy,
+			metrics.ErrorTypeLabel, errorType,
+		}
+
+		p.metricEmitter.Notify(metrics.Event{
+			Name:   metrics.KafkaPublished,
+			Value:  1,
+			Labels: labels,
+		})
+
+		// Record latency for all events
+		p.metricEmitter.Notify(metrics.Event{
+			Name:  metrics.KafkaPublishLatency,
+			Value: event.Duration.Seconds(),
+			Labels: []string{
 				metrics.TopicLabel, event.Topic,
-				metrics.TopicShardStrategyLabel, event.TopicShardStrategy,
-				metrics.ErrorTypeLabel, errorType,
-			}
-
-			p.metricEmitter.Notify(metrics.Event{
-				Name:   metrics.KafkaPublished,
-				Value:  1,
-				Labels: labels,
-			})
-		}
-
-		// Record latency for all events if enabled
-		if p.config.prometheus != nil && p.config.prometheus.IsPublishLatencyEnabled() {
-			p.metricEmitter.Notify(metrics.Event{
-				Name:  metrics.KafkaPublishLatency,
-				Value: event.Duration.Seconds(),
-				Labels: []string{
-					metrics.TopicLabel, event.Topic,
-					metrics.ErrorTypeLabel, func() string {
-						if event.Error != nil {
-							return event.ErrorType
-						}
-						return "none"
-					}(),
-				},
-			})
-		}
+				metrics.ErrorTypeLabel, func() string {
+					if event.Error != nil {
+						return event.ErrorType
+					}
+					return "none"
+				}(),
+			},
+		})
 
 	})
 
-	// Set up buffer utilization function for automatic Prometheus scraping
-	if p.config.maxBufferedRecords > 0 && p.config.prometheus != nil && p.config.prometheus.IsBufferUtilizationEnabled() {
+	// Set up buffer utilization function for automatic Prometheus scraping (always enabled)
+	if p.config.maxBufferedRecords > 0 {
 		metrics.BufferUtilization = p.wrpPublisher.BufferedRecords
 	}
 
@@ -196,7 +192,7 @@ func (p *KafkaPublisher) Stop(ctx context.Context) error {
 	}
 
 	// Clear the buffer utilization function
-	if p.config.maxBufferedRecords > 0 && p.config.prometheus != nil && p.config.prometheus.IsBufferUtilizationEnabled() {
+	if p.config.maxBufferedRecords > 0 {
 		metrics.BufferUtilization = nil
 	}
 

@@ -5,6 +5,8 @@ package consumer
 
 import (
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Config represents the YAML configuration for the Kafka consumer.
@@ -52,6 +54,9 @@ type Config struct {
 	// Fetch State Management
 	ResumeDelaySeconds          int
 	ConsecutiveFailureThreshold int
+
+	// Prometheus metrics configuration
+	Prometheus *PrometheusConfig
 }
 
 // SASLConfig contains SASL authentication configuration.
@@ -69,6 +74,60 @@ type TLSConfig struct {
 	CertFile           string
 	KeyFile            string
 	InsecureSkipVerify bool
+}
+
+// PrometheusConfig represents Prometheus metrics configuration for the consumer.
+// This consolidates all prometheus/kprom settings for franz-go into a single struct.
+type PrometheusConfig struct {
+	// Namespace is the prometheus namespace for metrics (e.g., "xmidt")
+	Namespace string `yaml:"namespace,omitempty"`
+
+	// Subsystem is the prometheus subsystem name (e.g., "splitter_consumer")
+	Subsystem string `yaml:"subsystem,omitempty"`
+
+	// Registerer is the prometheus registerer to use for metrics.
+	// If nil, metrics will be registered with the default prometheus registry.
+	// This field is typically set programmatically, not via YAML.
+	Registerer prometheus.Registerer `yaml:"-"`
+
+	// Optional franz-go kprom metrics (disabled by default)
+	// Core metrics (uncompressed bytes, records, batches, by_node, by_topic) are always enabled
+
+	// EnableCompressedBytes tracks compressed bytes (fetch_compressed_bytes_total).
+	// Default: false (adds overhead)
+	EnableCompressedBytes bool `yaml:"enable_compressed_bytes,omitempty"`
+
+	// EnableGoCollectors adds Go runtime metrics (goroutines, memory, etc.).
+	// Default: false
+	EnableGoCollectors bool `yaml:"enable_go_collectors,omitempty"`
+
+	// WithClientLabel adds a "client_id" label to all metrics.
+	// Default: false
+	WithClientLabel bool `yaml:"with_client_label,omitempty"`
+}
+
+// IsCompressedBytesEnabled returns true if compressed bytes metric should be enabled.
+func (p *PrometheusConfig) IsCompressedBytesEnabled() bool {
+	if p == nil {
+		return false
+	}
+	return p.EnableCompressedBytes
+}
+
+// IsGoCollectorsEnabled returns true if Go runtime metrics should be enabled.
+func (p *PrometheusConfig) IsGoCollectorsEnabled() bool {
+	if p == nil {
+		return false
+	}
+	return p.EnableGoCollectors
+}
+
+// IsClientLabelEnabled returns true if client_id label should be added.
+func (p *PrometheusConfig) IsClientLabelEnabled() bool {
+	if p == nil {
+		return false
+	}
+	return p.WithClientLabel
 }
 
 // Duration is a wrapper around time.Duration that supports YAML unmarshaling.

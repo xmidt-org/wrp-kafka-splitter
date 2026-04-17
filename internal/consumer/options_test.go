@@ -563,7 +563,10 @@ func (s *OptionsTestSuite) TestWithLogEmitter_Nil() {
 
 func (s *OptionsTestSuite) TestWithPrometheusMetrics() {
 	consumer, err := s.createTestConsumer(
-		WithPrometheusMetrics("test_namespace", "test_subsystem", nil),
+		WithPrometheusMetrics(&PrometheusConfig{
+			Namespace: "test_namespace",
+			Subsystem: "test_subsystem",
+		}),
 	)
 	s.NoError(err)
 	s.NotNil(consumer)
@@ -572,7 +575,10 @@ func (s *OptionsTestSuite) TestWithPrometheusMetrics() {
 
 func (s *OptionsTestSuite) TestWithPrometheusMetrics_EmptyNamespace() {
 	consumer, err := s.createTestConsumer(
-		WithPrometheusMetrics("", "subsystem", nil),
+		WithPrometheusMetrics(&PrometheusConfig{
+			Namespace: "",
+			Subsystem: "subsystem",
+		}),
 	)
 	s.Error(err)
 	s.Nil(consumer)
@@ -581,7 +587,10 @@ func (s *OptionsTestSuite) TestWithPrometheusMetrics_EmptyNamespace() {
 
 func (s *OptionsTestSuite) TestWithPrometheusMetrics_EmptySubsystem() {
 	consumer, err := s.createTestConsumer(
-		WithPrometheusMetrics("namespace", "", nil),
+		WithPrometheusMetrics(&PrometheusConfig{
+			Namespace: "namespace",
+			Subsystem: "",
+		}),
 	)
 	s.Error(err)
 	s.Nil(consumer)
@@ -593,7 +602,11 @@ func (s *OptionsTestSuite) TestWithPrometheusMetrics_CustomRegistry() {
 	customRegistry := prometheus.NewRegistry()
 
 	consumer, err := s.createTestConsumer(
-		WithPrometheusMetrics("custom_namespace", "custom_subsystem", customRegistry),
+		WithPrometheusMetrics(&PrometheusConfig{
+			Namespace:  "custom_namespace",
+			Subsystem:  "custom_subsystem",
+			Registerer: customRegistry,
+		}),
 	)
 	s.NoError(err)
 	s.NotNil(consumer)

@@ -33,6 +33,9 @@ type Config struct {
 
 	// TLS configuration
 	TLS *TLSConfig
+
+	// Prometheus metrics configuration
+	Prometheus *PrometheusConfig
 }
 
 type Brokers struct {
@@ -107,49 +110,12 @@ type PrometheusConfig struct {
 	// This field is typically set programmatically, not via YAML.
 	Registerer prometheus.Registerer `yaml:"-"`
 
-	// Franz-go specific prometheus metrics options
+	// Optional franz-go prometheus metrics options (disabled by default)
+	// Application-level metrics (buffer utilization, publish counter, publish latency) are always enabled
+
 	EnableRecordMetrics   bool `yaml:"enable_record_metrics,omitempty"`
 	EnableBatchMetrics    bool `yaml:"enable_batch_metrics,omitempty"`
 	EnableCompressedBytes bool `yaml:"enable_compressed_bytes,omitempty"`
 	EnableGoCollectors    bool `yaml:"enable_go_collectors,omitempty"`
 	WithClientLabel       bool `yaml:"with_client_label,omitempty"`
-
-	// Application-level metric controls for splitter
-	// These control metrics emitted by the splitter itself, not franz-go
-
-	// EnableBufferUtilization controls whether to expose the buffer utilization gauge metric.
-	// Default: true
-	EnableBufferUtilization *bool `yaml:"enable_buffer_utilization,omitempty"`
-
-	// EnablePublishCounter controls whether to expose the messages published counter metric.
-	// Default: true
-	EnablePublishCounter *bool `yaml:"enable_publish_counter,omitempty"`
-
-	// EnablePublishLatency controls whether to expose the publish latency histogram metric.
-	// Default: true
-	EnablePublishLatency *bool `yaml:"enable_publish_latency,omitempty"`
-}
-
-// IsBufferUtilizationEnabled returns true if buffer utilization metric should be enabled.
-func (p *PrometheusConfig) IsBufferUtilizationEnabled() bool {
-	if p == nil || p.EnableBufferUtilization == nil {
-		return true // default enabled
-	}
-	return *p.EnableBufferUtilization
-}
-
-// IsPublishCounterEnabled returns true if publish counter metric should be enabled.
-func (p *PrometheusConfig) IsPublishCounterEnabled() bool {
-	if p == nil || p.EnablePublishCounter == nil {
-		return true // default enabled
-	}
-	return *p.EnablePublishCounter
-}
-
-// IsPublishLatencyEnabled returns true if publish latency metric should be enabled.
-func (p *PrometheusConfig) IsPublishLatencyEnabled() bool {
-	if p == nil || p.EnablePublishLatency == nil {
-		return true // default enabled
-	}
-	return *p.EnablePublishLatency
 }

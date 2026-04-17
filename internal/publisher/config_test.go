@@ -484,8 +484,8 @@ func (suite *OptionsTestSuite) TestOptions() {
 			description: "Should enable TLS with default config",
 		},
 		{
-			name:   "WithPrometheusMetrics_both_values",
-			option: WithPrometheusMetrics("xmidt", "splitter", nil),
+			name:   "WithPrometheusConfig_both_values",
+			option: WithPrometheusConfig(&PrometheusConfig{Namespace: "xmidt", Subsystem: "splitter"}),
 			setupPub: func() *KafkaPublisher {
 				return &KafkaPublisher{config: &publisherConfig{}}
 			},
@@ -497,8 +497,8 @@ func (suite *OptionsTestSuite) TestOptions() {
 			description: "Should set Prometheus namespace and subsystem correctly",
 		},
 		{
-			name:   "WithPrometheusMetrics_empty_values",
-			option: WithPrometheusMetrics("", "", nil),
+			name:   "WithPrometheusConfig_empty_values",
+			option: WithPrometheusConfig(&PrometheusConfig{Namespace: "", Subsystem: ""}),
 			setupPub: func() *KafkaPublisher {
 				return &KafkaPublisher{config: &publisherConfig{}}
 			},
@@ -510,8 +510,8 @@ func (suite *OptionsTestSuite) TestOptions() {
 			description: "Should accept empty Prometheus namespace and subsystem",
 		},
 		{
-			name:   "WithPrometheusMetrics_namespace_only",
-			option: WithPrometheusMetrics("monitoring", "", nil),
+			name:   "WithPrometheusConfig_namespace_only",
+			option: WithPrometheusConfig(&PrometheusConfig{Namespace: "monitoring", Subsystem: ""}),
 			setupPub: func() *KafkaPublisher {
 				return &KafkaPublisher{config: &publisherConfig{}}
 			},
@@ -523,8 +523,8 @@ func (suite *OptionsTestSuite) TestOptions() {
 			description: "Should set Prometheus namespace with empty subsystem",
 		},
 		{
-			name:   "WithPrometheusMetrics_subsystem_only",
-			option: WithPrometheusMetrics("", "kafka", nil),
+			name:   "WithPrometheusConfig_subsystem_only",
+			option: WithPrometheusConfig(&PrometheusConfig{Namespace: "", Subsystem: "kafka"}),
 			setupPub: func() *KafkaPublisher {
 				return &KafkaPublisher{config: &publisherConfig{}}
 			},

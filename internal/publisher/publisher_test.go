@@ -15,6 +15,7 @@ import (
 	"xmidt-org/splitter/internal/metrics"
 	"xmidt-org/splitter/internal/observe"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/suite"
 	"github.com/xmidt-org/wrp-go/v5"
 	"github.com/xmidt-org/wrpkafka"
@@ -185,7 +186,7 @@ func (suite *PublisherTestSuite) TestNew() {
 			options: []Option{
 				WithBrokers(testBroker),
 				WithTopicRoutes(wrpkafka.TopicRoute{Topic: "test", Pattern: ".*"}),
-				WithPrometheusMetrics("xmidt", "splitter", nil),
+				WithPrometheusConfig(&PrometheusConfig{Namespace: "xmidt", Subsystem: "splitter"}),
 			},
 			expectError: false,
 			description: "Should create publisher with Prometheus metrics configuration",
@@ -195,7 +196,7 @@ func (suite *PublisherTestSuite) TestNew() {
 			options: []Option{
 				WithBrokers(testBroker),
 				WithTopicRoutes(wrpkafka.TopicRoute{Topic: "test", Pattern: ".*"}),
-				WithPrometheusMetrics("", "", nil),
+				WithPrometheusConfig(&PrometheusConfig{Namespace: "", Subsystem: ""}),
 			},
 			expectError: false,
 			description: "Should create publisher with empty Prometheus namespace and subsystem",
@@ -273,7 +274,7 @@ func (suite *PublisherTestSuite) TestPrometheusMetricsConfiguration() {
 			publisher, err := New(
 				WithBrokers(testBroker),
 				WithTopicRoutes(wrpkafka.TopicRoute{Topic: "test", Pattern: ".*"}),
-				WithPrometheusMetrics(tt.namespace, tt.subsystem, nil),
+				WithPrometheusConfig(&PrometheusConfig{Namespace: tt.namespace, Subsystem: tt.subsystem}),
 			)
 
 			suite.NoError(err, tt.description)
@@ -283,6 +284,158 @@ func (suite *PublisherTestSuite) TestPrometheusMetricsConfiguration() {
 			// Verify that the Prometheus configuration was passed to the underlying wrpkafka.Publisher
 			suite.Equal(tt.expectedNamespace, publisher.wrpPublisher.Prometheus.Namespace, "Prometheus namespace should match")
 			suite.Equal(tt.expectedSubsystem, publisher.wrpPublisher.Prometheus.Subsystem, "Prometheus subsystem should match")
+		})
+	}
+}
+
+// Test toWRPKafkaPrometheusConfig conversion method
+func (suite *PublisherTestSuite) TestToWRPKafkaPrometheusConfig() {
+	tests := []struct {
+		name        string
+		config      *PrometheusConfig
+		expected    wrpkafka.PrometheusConfig
+		description string
+	}{
+		{
+			name:   "nil_config",
+			config: nil,
+			expected: wrpkafka.PrometheusConfig{
+				Namespace:             "",
+				Subsystem:             "",
+				Registerer:            nil,
+				EnableRecordMetrics:   false,
+				EnableBatchMetrics:    false,
+				EnableCompressedBytes: false,
+				EnableGoCollectors:    false,
+				WithClientLabel:       false,
+			},
+			description: "Should return empty config when PrometheusConfig is nil",
+		},
+		{
+			name: "basic_namespace_subsystem",
+			config: &PrometheusConfig{
+				Namespace: "xmidt",
+				Subsystem: "splitter_publisher",
+			},
+			expected: wrpkafka.PrometheusConfig{
+				Namespace:             "xmidt",
+				Subsystem:             "splitter_publisher",
+				Registerer:            nil,
+				EnableRecordMetrics:   false,
+				EnableBatchMetrics:    false,
+				EnableCompressedBytes: false,
+				EnableGoCollectors:    false,
+				WithClientLabel:       false,
+			},
+			description: "Should convert basic namespace and subsystem with defaults",
+		},
+		{
+			name: "all_optional_metrics_enabled",
+			config: &PrometheusConfig{
+				Namespace:             "xmidt",
+				Subsystem:             "publisher",
+				EnableRecordMetrics:   true,
+				EnableBatchMetrics:    true,
+				EnableCompressedBytes: true,
+				EnableGoCollectors:    true,
+				WithClientLabel:       true,
+			},
+			expected: wrpkafka.PrometheusConfig{
+				Namespace:             "xmidt",
+				Subsystem:             "publisher",
+				Registerer:            nil,
+				EnableRecordMetrics:   true,
+				EnableBatchMetrics:    true,
+				EnableCompressedBytes: true,
+				EnableGoCollectors:    true,
+				WithClientLabel:       true,
+			},
+			description: "Should enable all optional franz-go metrics when configured",
+		},
+		{
+			name: "selective_metrics",
+			config: &PrometheusConfig{
+				Namespace:           "monitoring",
+				Subsystem:           "kafka",
+				EnableRecordMetrics: true,
+				EnableGoCollectors:  true,
+				// Other metrics remain false (default)
+			},
+			expected: wrpkafka.PrometheusConfig{
+				Namespace:             "monitoring",
+				Subsystem:             "kafka",
+				Registerer:            nil,
+				EnableRecordMetrics:   true,
+				EnableBatchMetrics:    false,
+				EnableCompressedBytes: false,
+				EnableGoCollectors:    true,
+				WithClientLabel:       false,
+			},
+			description: "Should selectively enable only specified metrics",
+		},
+		{
+			name: "empty_namespace_subsystem_with_metrics",
+			config: &PrometheusConfig{
+				Namespace:          "",
+				Subsystem:          "",
+				EnableBatchMetrics: true,
+				WithClientLabel:    true,
+			},
+			expected: wrpkafka.PrometheusConfig{
+				Namespace:             "",
+				Subsystem:             "",
+				Registerer:            nil,
+				EnableRecordMetrics:   false,
+				EnableBatchMetrics:    true,
+				EnableCompressedBytes: false,
+				EnableGoCollectors:    false,
+				WithClientLabel:       true,
+			},
+			description: "Should handle empty namespace/subsystem with enabled metrics",
+		},
+		{
+			name: "with_custom_registerer",
+			config: &PrometheusConfig{
+				Namespace:           "custom",
+				Subsystem:           "metrics",
+				Registerer:          &mockRegisterer{},
+				EnableRecordMetrics: true,
+			},
+			expected: wrpkafka.PrometheusConfig{
+				Namespace:             "custom",
+				Subsystem:             "metrics",
+				Registerer:            &mockRegisterer{},
+				EnableRecordMetrics:   true,
+				EnableBatchMetrics:    false,
+				EnableCompressedBytes: false,
+				EnableGoCollectors:    false,
+				WithClientLabel:       false,
+			},
+			description: "Should pass through custom Prometheus registerer",
+		},
+	}
+
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+			// Create a publisher with the test config
+			pub := &KafkaPublisher{
+				config: &publisherConfig{
+					prometheus: tt.config,
+				},
+			}
+
+			// Call the conversion method
+			result := pub.toWRPKafkaPrometheusConfig()
+
+			// Verify all fields
+			suite.Equal(tt.expected.Namespace, result.Namespace, "Namespace should match")
+			suite.Equal(tt.expected.Subsystem, result.Subsystem, "Subsystem should match")
+			suite.Equal(tt.expected.Registerer, result.Registerer, "Registerer should match")
+			suite.Equal(tt.expected.EnableRecordMetrics, result.EnableRecordMetrics, "EnableRecordMetrics should match")
+			suite.Equal(tt.expected.EnableBatchMetrics, result.EnableBatchMetrics, "EnableBatchMetrics should match")
+			suite.Equal(tt.expected.EnableCompressedBytes, result.EnableCompressedBytes, "EnableCompressedBytes should match")
+			suite.Equal(tt.expected.EnableGoCollectors, result.EnableGoCollectors, "EnableGoCollectors should match")
+			suite.Equal(tt.expected.WithClientLabel, result.WithClientLabel, "WithClientLabel should match")
 		})
 	}
 }
@@ -754,6 +907,19 @@ func (suite *PublisherTestSuite) TestPublisherValidation() {
 			}
 		})
 	}
+}
+
+// mockRegisterer is a mock implementation of prometheus.Registerer for testing
+type mockRegisterer struct{}
+
+func (m *mockRegisterer) Register(prometheus.Collector) error {
+	return nil
+}
+
+func (m *mockRegisterer) MustRegister(...prometheus.Collector) {}
+
+func (m *mockRegisterer) Unregister(prometheus.Collector) bool {
+	return true
 }
 
 // Run the test suite

@@ -15,7 +15,6 @@ import (
 	"xmidt-org/splitter/internal/metrics"
 	"xmidt-org/splitter/internal/observe"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/sasl"
 	"github.com/twmb/franz-go/pkg/sasl/plain"
@@ -309,22 +308,13 @@ func WithTLS() Option {
 }
 
 // WithPrometheusConfig configures Prometheus metrics for the publisher.
-// This consolidates all prometheus settings into a single struct.
+// This consolidates all prometheus settings into a single struct with fine-grained control
+// over individual metrics and franz-go specific options.
 func WithPrometheusConfig(config *PrometheusConfig) Option {
 	return optionFunc(func(p *KafkaPublisher) error {
 		if config != nil {
 			p.config.prometheus = config
 		}
 		return nil
-	})
-}
-
-// WithPrometheusMetrics configures Prometheus metrics with basic settings.
-// For more control over individual metrics, use WithPrometheusConfig instead.
-func WithPrometheusMetrics(namespace, subsystem string, registerer prometheus.Registerer) Option {
-	return WithPrometheusConfig(&PrometheusConfig{
-		Namespace:  namespace,
-		Subsystem:  subsystem,
-		Registerer: registerer,
 	})
 }
