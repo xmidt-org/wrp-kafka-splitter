@@ -53,16 +53,14 @@ func provideConsumer(in ConsumerIn) (ConsumerOut, error) {
 		return ConsumerOut{}, fmt.Errorf("failed to create WRP message handler: %w", err)
 	}
 
+	// Build prometheus config merging YAML config with touchstone config
+	promConfig := buildConsumerPrometheusConfig(cfg.Prometheus, in.PrometheusConfig, in.PrometheusRegisterer)
+
 	// Build options from configuration - validation is handled by the option functions
 	opts := []consumer.Option{
 		// Observability
 		consumer.WithLogEmitter(in.LogEmitter),
-		consumer.WithPrometheusMetrics(&consumer.PrometheusConfig{
-			Namespace:  in.PrometheusConfig.DefaultNamespace,
-			Subsystem:  in.PrometheusConfig.DefaultSubsystem + "_consumer",
-			Registerer: in.PrometheusRegisterer,
-			// All metrics enabled by default (nil = enabled)
-		}),
+		consumer.WithPrometheusMetrics(promConfig),
 		consumer.WithMetricsEmitter(in.MetricEmitter),
 
 		// Required options
@@ -118,4 +116,30 @@ func provideConsumer(in ConsumerIn) (ConsumerOut, error) {
 	}
 
 	return ConsumerOut{Consumer: c}, nil
+}
+
+// buildConsumerPrometheusConfig merges YAML prometheus configuration with touchstone configuration.
+// Optional metrics are taken from YAML config (or default to disabled if not specified).
+// Namespace, subsystem, and registerer always come from touchstone to ensure consistency.
+func buildConsumerPrometheusConfig(
+	yamlConfig *consumer.PrometheusConfig,
+	touchstoneConfig touchstone.Config,
+	registerer prometheus.Registerer,
+) *consumer.PrometheusConfig {
+	// Start with optional metrics from YAML (or defaults if nil)
+	config := &consumer.PrometheusConfig{
+		// Namespace/Subsystem/Registerer always come from touchstone for consistency
+		Namespace:  touchstoneConfig.DefaultNamespace,
+		Subsystem:  touchstoneConfig.DefaultSubsystem + "_consumer",
+		Registerer: registerer,
+	}
+
+	// Apply optional metrics from YAML if provided
+	if yamlConfig != nil {
+		config.EnableCompressedBytes = yamlConfig.EnableCompressedBytes
+		config.EnableGoCollectors = yamlConfig.EnableGoCollectors
+		config.WithClientLabel = yamlConfig.WithClientLabel
+	}
+
+	return config
 }
