@@ -113,7 +113,6 @@ type PrometheusConfig struct {
 	// Optional franz-go prometheus metrics options (disabled by default)
 	// Application-level metrics (buffer utilization, publish counter, publish latency) are always enabled
 
-	EnableRecordMetrics   bool `yaml:"enable_record_metrics,omitempty"`
 	EnableBatchMetrics    bool `yaml:"enable_batch_metrics,omitempty"`
 	EnableCompressedBytes bool `yaml:"enable_compressed_bytes,omitempty"`
 	EnableGoCollectors    bool `yaml:"enable_go_collectors,omitempty"`

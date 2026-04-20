@@ -17,16 +17,15 @@ func TestBuildPrometheusConfig(t *testing.T) {
 	tests := []struct {
 		name                    string
 		yamlCfg                 *publisher.PrometheusConfig
-		expectedRecordMetrics   bool
 		expectedBatchMetrics    bool
 		expectedCompressedBytes bool
 		expectedGoCollectors    bool
 		expectedClientLabel     bool
 	}{
 		{
-			name:                    "NilYAMLConfig_DefaultsToDisabled",
-			yamlCfg:                 nil,
-			expectedRecordMetrics:   false,
+			name:    "NilYAMLConfig_DefaultsToDisabled",
+			yamlCfg: nil,
+
 			expectedBatchMetrics:    false,
 			expectedCompressedBytes: false,
 			expectedGoCollectors:    false,
@@ -35,13 +34,11 @@ func TestBuildPrometheusConfig(t *testing.T) {
 		{
 			name: "AllOptionalMetricsEnabled",
 			yamlCfg: &publisher.PrometheusConfig{
-				EnableRecordMetrics:   true,
 				EnableBatchMetrics:    true,
 				EnableCompressedBytes: true,
 				EnableGoCollectors:    true,
 				WithClientLabel:       true,
 			},
-			expectedRecordMetrics:   true,
 			expectedBatchMetrics:    true,
 			expectedCompressedBytes: true,
 			expectedGoCollectors:    true,
@@ -50,11 +47,9 @@ func TestBuildPrometheusConfig(t *testing.T) {
 		{
 			name: "SomeOptionalMetricsEnabled",
 			yamlCfg: &publisher.PrometheusConfig{
-				EnableRecordMetrics:   true,
 				EnableCompressedBytes: true,
 				// BatchMetrics, GoCollectors, ClientLabel remain false
 			},
-			expectedRecordMetrics:   true,
 			expectedBatchMetrics:    false,
 			expectedCompressedBytes: true,
 			expectedGoCollectors:    false,
@@ -63,13 +58,11 @@ func TestBuildPrometheusConfig(t *testing.T) {
 		{
 			name: "AllOptionalMetricsDisabled",
 			yamlCfg: &publisher.PrometheusConfig{
-				EnableRecordMetrics:   false,
 				EnableBatchMetrics:    false,
 				EnableCompressedBytes: false,
 				EnableGoCollectors:    false,
 				WithClientLabel:       false,
 			},
-			expectedRecordMetrics:   false,
 			expectedBatchMetrics:    false,
 			expectedCompressedBytes: false,
 			expectedGoCollectors:    false,
@@ -95,7 +88,6 @@ func TestBuildPrometheusConfig(t *testing.T) {
 			assert.Equal(t, registerer, result.Registerer, "registerer should come from touchstone")
 
 			// Verify: optional metrics match expected values
-			assert.Equal(t, tt.expectedRecordMetrics, result.EnableRecordMetrics, "EnableRecordMetrics mismatch")
 			assert.Equal(t, tt.expectedBatchMetrics, result.EnableBatchMetrics, "EnableBatchMetrics mismatch")
 			assert.Equal(t, tt.expectedCompressedBytes, result.EnableCompressedBytes, "EnableCompressedBytes mismatch")
 			assert.Equal(t, tt.expectedGoCollectors, result.EnableGoCollectors, "EnableGoCollectors mismatch")
@@ -110,7 +102,6 @@ func TestBuildPrometheusConfig_YAMLNamespaceIgnored(t *testing.T) {
 	yamlCfg := &publisher.PrometheusConfig{
 		Namespace:             "yaml_namespace", // Should be ignored
 		Subsystem:             "yaml_subsystem", // Should be ignored
-		EnableRecordMetrics:   true,
 		EnableCompressedBytes: true,
 	}
 
@@ -127,6 +118,5 @@ func TestBuildPrometheusConfig_YAMLNamespaceIgnored(t *testing.T) {
 	assert.Equal(t, "touchstone_subsystem_publisher", result.Subsystem, "subsystem must come from touchstone, not YAML")
 
 	// Verify optional metrics still copied
-	assert.True(t, result.EnableRecordMetrics, "optional metrics should still be copied from YAML")
 	assert.True(t, result.EnableCompressedBytes, "optional metrics should still be copied from YAML")
 }

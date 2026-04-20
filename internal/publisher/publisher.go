@@ -100,7 +100,6 @@ func (p *KafkaPublisher) toWRPKafkaPrometheusConfig() wrpkafka.PrometheusConfig 
 		Namespace:             p.config.prometheus.Namespace,
 		Subsystem:             p.config.prometheus.Subsystem,
 		Registerer:            p.config.prometheus.Registerer,
-		EnableRecordMetrics:   p.config.prometheus.EnableRecordMetrics,
 		EnableBatchMetrics:    p.config.prometheus.EnableBatchMetrics,
 		EnableCompressedBytes: p.config.prometheus.EnableCompressedBytes,
 		EnableGoCollectors:    p.config.prometheus.EnableGoCollectors,
