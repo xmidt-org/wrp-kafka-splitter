@@ -300,10 +300,10 @@ func (suite *PublisherTestSuite) TestToWRPKafkaPrometheusConfig() {
 			name:   "nil_config",
 			config: nil,
 			expected: wrpkafka.PrometheusConfig{
-				Namespace:             "",
-				Subsystem:             "",
-				Registerer:            nil,
-				EnableRecordMetrics:   false,
+				Namespace:  "",
+				Subsystem:  "",
+				Registerer: nil,
+
 				EnableBatchMetrics:    false,
 				EnableCompressedBytes: false,
 				EnableGoCollectors:    false,
@@ -321,7 +321,6 @@ func (suite *PublisherTestSuite) TestToWRPKafkaPrometheusConfig() {
 				Namespace:             "xmidt",
 				Subsystem:             "splitter_publisher",
 				Registerer:            nil,
-				EnableRecordMetrics:   false,
 				EnableBatchMetrics:    false,
 				EnableCompressedBytes: false,
 				EnableGoCollectors:    false,
@@ -334,7 +333,6 @@ func (suite *PublisherTestSuite) TestToWRPKafkaPrometheusConfig() {
 			config: &PrometheusConfig{
 				Namespace:             "xmidt",
 				Subsystem:             "publisher",
-				EnableRecordMetrics:   true,
 				EnableBatchMetrics:    true,
 				EnableCompressedBytes: true,
 				EnableGoCollectors:    true,
@@ -344,7 +342,6 @@ func (suite *PublisherTestSuite) TestToWRPKafkaPrometheusConfig() {
 				Namespace:             "xmidt",
 				Subsystem:             "publisher",
 				Registerer:            nil,
-				EnableRecordMetrics:   true,
 				EnableBatchMetrics:    true,
 				EnableCompressedBytes: true,
 				EnableGoCollectors:    true,
@@ -355,17 +352,15 @@ func (suite *PublisherTestSuite) TestToWRPKafkaPrometheusConfig() {
 		{
 			name: "selective_metrics",
 			config: &PrometheusConfig{
-				Namespace:           "monitoring",
-				Subsystem:           "kafka",
-				EnableRecordMetrics: true,
-				EnableGoCollectors:  true,
+				Namespace:          "monitoring",
+				Subsystem:          "kafka",
+				EnableGoCollectors: true,
 				// Other metrics remain false (default)
 			},
 			expected: wrpkafka.PrometheusConfig{
 				Namespace:             "monitoring",
 				Subsystem:             "kafka",
 				Registerer:            nil,
-				EnableRecordMetrics:   true,
 				EnableBatchMetrics:    false,
 				EnableCompressedBytes: false,
 				EnableGoCollectors:    true,
@@ -385,7 +380,6 @@ func (suite *PublisherTestSuite) TestToWRPKafkaPrometheusConfig() {
 				Namespace:             "",
 				Subsystem:             "",
 				Registerer:            nil,
-				EnableRecordMetrics:   false,
 				EnableBatchMetrics:    true,
 				EnableCompressedBytes: false,
 				EnableGoCollectors:    false,
@@ -396,16 +390,14 @@ func (suite *PublisherTestSuite) TestToWRPKafkaPrometheusConfig() {
 		{
 			name: "with_custom_registerer",
 			config: &PrometheusConfig{
-				Namespace:           "custom",
-				Subsystem:           "metrics",
-				Registerer:          &mockRegisterer{},
-				EnableRecordMetrics: true,
+				Namespace:  "custom",
+				Subsystem:  "metrics",
+				Registerer: &mockRegisterer{},
 			},
 			expected: wrpkafka.PrometheusConfig{
 				Namespace:             "custom",
 				Subsystem:             "metrics",
 				Registerer:            &mockRegisterer{},
-				EnableRecordMetrics:   true,
 				EnableBatchMetrics:    false,
 				EnableCompressedBytes: false,
 				EnableGoCollectors:    false,
@@ -431,7 +423,6 @@ func (suite *PublisherTestSuite) TestToWRPKafkaPrometheusConfig() {
 			suite.Equal(tt.expected.Namespace, result.Namespace, "Namespace should match")
 			suite.Equal(tt.expected.Subsystem, result.Subsystem, "Subsystem should match")
 			suite.Equal(tt.expected.Registerer, result.Registerer, "Registerer should match")
-			suite.Equal(tt.expected.EnableRecordMetrics, result.EnableRecordMetrics, "EnableRecordMetrics should match")
 			suite.Equal(tt.expected.EnableBatchMetrics, result.EnableBatchMetrics, "EnableBatchMetrics should match")
 			suite.Equal(tt.expected.EnableCompressedBytes, result.EnableCompressedBytes, "EnableCompressedBytes should match")
 			suite.Equal(tt.expected.EnableGoCollectors, result.EnableGoCollectors, "EnableGoCollectors should match")

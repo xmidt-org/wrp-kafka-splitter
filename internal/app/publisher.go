@@ -96,7 +96,6 @@ func buildPrometheusConfig(yamlCfg *publisher.PrometheusConfig, touchstoneCfg to
 
 	// If YAML config is provided, use it for optional franz-go metrics
 	if yamlCfg != nil {
-		cfg.EnableRecordMetrics = yamlCfg.EnableRecordMetrics
 		cfg.EnableBatchMetrics = yamlCfg.EnableBatchMetrics
 		cfg.EnableCompressedBytes = yamlCfg.EnableCompressedBytes
 		cfg.EnableGoCollectors = yamlCfg.EnableGoCollectors
