@@ -201,8 +201,8 @@ github.com/ugorji/go/codec v1.2.12 h1:9LC83zGrHhuUA9l16C9AHXAqEV/2wBQ4nkvumAE65E
 github.com/ugorji/go/codec v1.2.12/go.mod h1:UNopzCgEMSXjBc6AOMqYvWC1ktqTAfzJZUZgYf6w6lg=
 github.com/xmidt-org/arrange v0.5.4 h1:I3K69dVTdFDCKaDCDINpFDwizoOvNch5P6FQrBwtBpM=
 github.com/xmidt-org/arrange v0.5.4/go.mod h1:As2xqHS81BGDvn4lZiGurG40VXNPGsv0yiIGmtL8F/8=
-github.com/xmidt-org/candlelight v0.2.8 h1:UVfnk3RHQmR2mkRzg8lvNS53ynklNhowdIis2bCQhFs=
-github.com/xmidt-org/candlelight v0.2.8/go.mod h1:5OMLPpvD87Ic5Ve3WeaAcFAElw50EDUad71ANjaG3DY=
+github.com/xmidt-org/candlelight v0.2.9 h1:IqrY6jfKgLyzNSpdEcgtL+Sd+ECyLN5upw84B6YVjeg=
+github.com/xmidt-org/candlelight v0.2.9/go.mod h1:5OMLPpvD87Ic5Ve3WeaAcFAElw50EDUad71ANjaG3DY=
 github.com/xmidt-org/eventor v1.0.46 h1:xCWYVdpS7Dh3fIsmhkbabO7Y+MCCtyAUinh0ClgyHTc=
 github.com/xmidt-org/eventor v1.0.46/go.mod h1:hDYVga+QLP8ZfwIBtmDvXRtYbY2dPa6i0PNQrqtwYUg=
 github.com/xmidt-org/httpaux v0.4.3 h1:hrA8tAgMFoZkBZrysSmmait9CP7P3hMAYQjnpFJNqk8=
