@@ -114,7 +114,7 @@ require (
 	github.com/magiconair/properties v1.8.10 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/xmidt-org/arrange v0.5.4
-	github.com/xmidt-org/candlelight v0.2.9
+	github.com/xmidt-org/candlelight v0.2.10
 	github.com/xmidt-org/touchstone v0.1.8
 	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
