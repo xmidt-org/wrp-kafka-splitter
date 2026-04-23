@@ -112,10 +112,23 @@ func (h *WRPMessageHandler) HandleMessage(ctx context.Context, record *kgo.Recor
 	var msg wrp.Message
 	if err := wrp.NewDecoderBytes(record.Value, wrp.Msgpack).Decode(&msg); err != nil {
 
-		// Don't return error for malformed messages - just log and continue
+		// Log the error and the malformed message
 		h.emitLog(log.LevelWarn, "decode WRP message", map[string]any{
 			"error": err.Error(),
 		})
+		h.emitLog(log.LevelDebug, "malformed WRP message", map[string]any{
+			"message": string(record.Value),
+		})
+
+		// Increment the malformed message metric
+		h.metricEmitter.Notify(metrics.Event{
+			Name: metrics.MalformedMessageCount,
+			Labels: []string{
+				metrics.ErrorTypeLabel, "malformed",
+			},
+			Value: 1,
+		})
+
 		return Failed, ErrMalformedMsg
 	}
 

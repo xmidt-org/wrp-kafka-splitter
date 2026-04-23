@@ -47,6 +47,7 @@ const (
 	Panics                 = "panics_total"
 	UnknownMetrics         = "unknown_metrics_total"
 	MetricPanics           = "metric_panics_total"
+	MalformedMessageCount  = "malformed_message_count"
 )
 
 // labels
@@ -148,6 +149,12 @@ var fxMetrics = []metricDefinition{
 		Name:   MetricPanics,
 		Help:   "Number of panics encountered while handling metrics events",
 		Labels: fmt.Sprintf("%s,%s", MetricNameLabel, MetricTypeLabel),
+	},
+	{
+		Type:   COUNTER,
+		Name:   MalformedMessageCount,
+		Help:   "Total number of malformed messages received from Kafka",
+		Labels: ErrorTypeLabel,
 	},
 }
 

@@ -19,11 +19,12 @@ type Metrics struct {
 	PublisherErrorsCounter kit.Counter
 
 	// Kafka publisher metrics (wrpkafka event listeners)
-	KafkaPublished      kit.Counter
-	KafkaPublishLatency kit.Histogram
-	Panics              kit.Counter
-	UnknownMetrics      kit.Counter
-	MetricPanics        kit.Counter
+	KafkaPublished        kit.Counter
+	KafkaPublishLatency   kit.Histogram
+	Panics                kit.Counter
+	UnknownMetrics        kit.Counter
+	MetricPanics          kit.Counter
+	MalformedMessageCount kit.Counter
 }
 
 // New creates a new Subject for metric events with unknown metrics tracking
@@ -39,6 +40,7 @@ func New(m Metrics) *observe.Subject[Event] {
 		PublisherErrorsCounter: m.PublisherErrorsCounter,
 		KafkaPublished:         m.KafkaPublished,
 		Panics:                 m.Panics,
+		MalformedMessageCount:  m.MalformedMessageCount,
 	}
 
 	gaugeMetrics := map[string]kit.Gauge{
