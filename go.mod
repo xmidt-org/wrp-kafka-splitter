@@ -113,12 +113,12 @@ require (
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/magiconair/properties v1.8.10 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/xmidt-org/arrange v0.5.4
+	github.com/xmidt-org/arrange v0.5.5
 	github.com/xmidt-org/candlelight v0.2.11
 	github.com/xmidt-org/touchstone v0.1.8
 	go.uber.org/dig v1.19.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.1 // indirect
+	go.uber.org/zap v1.28.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
