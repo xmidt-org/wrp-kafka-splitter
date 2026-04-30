@@ -110,7 +110,7 @@ func (h *WRPMessageHandler) HandleMessage(ctx context.Context, record *kgo.Recor
 
 	// Decode WRP message
 	var msg wrp.Message
-	if err := wrp.NewDecoderBytes(record.Value, wrp.Msgpack).Decode(&msg); err != nil {
+	if err := wrp.NewDecoderBytes(record.Value, wrp.Msgpack).Decode(&msg, wrp.NoStandardValidation()); err != nil {
 
 		// Log the error and the malformed message
 		h.emitLog(log.LevelWarn, "decode WRP message", map[string]any{

@@ -54,7 +54,7 @@ func (suite *HandlerTestSuite) TestHandleMessage_NotInTargetBucket() {
 	msg := createValidWrpMsg()
 	var buf bytes.Buffer
 	enc := wrp.NewEncoder(&buf, wrp.Msgpack)
-	_ = enc.Encode(msg)
+	_ = enc.Encode(msg, wrp.NoStandardValidation())
 	b := buf.Bytes()
 	suite.buckets.On("IsInTargetBucket", mock.Anything).Return(false, nil).Once()
 	record := &kgo.Record{Value: b}
@@ -68,7 +68,7 @@ func (suite *HandlerTestSuite) TestHandleMessage_ProduceError() {
 	msg := createValidWrpMsg()
 	var buf bytes.Buffer
 	enc := wrp.NewEncoder(&buf, wrp.Msgpack)
-	_ = enc.Encode(msg)
+	_ = enc.Encode(msg, wrp.NoStandardValidation())
 	b := buf.Bytes()
 	suite.buckets.On("IsInTargetBucket", mock.Anything).Return(true, nil).Once()
 	suite.producer.On("Produce", mock.Anything, mock.Anything).Return(wrpkafka.Failed, errors.New("produce fail")).Once()
@@ -84,7 +84,29 @@ func (suite *HandlerTestSuite) TestHandleMessage_Success() {
 	msg := createValidWrpMsg()
 	var buf bytes.Buffer
 	enc := wrp.NewEncoder(&buf, wrp.Msgpack)
-	_ = enc.Encode(msg)
+	_ = enc.Encode(msg, wrp.NoStandardValidation())
+	b := buf.Bytes()
+	suite.buckets.On("IsInTargetBucket", mock.Anything).Return(true, nil).Once()
+	suite.producer.On("Produce", mock.Anything, mock.Anything).Return(wrpkafka.Attempted, nil).Once()
+	record := &kgo.Record{Value: b}
+	outcome, err := suite.handler.HandleMessage(context.Background(), record)
+	assert.NoError(suite.T(), err)
+	assert.Equal(suite.T(), Attempted, outcome)
+	suite.buckets.AssertExpectations(suite.T())
+	suite.producer.AssertExpectations(suite.T())
+}
+
+func (suite *HandlerTestSuite) TestHandleMessage_SuccessWithNoStandardValidation() {
+	// Test that source value gets decoded successfully even if it doesn't conform to standard WRP validation rules, since we're using NoStandardValidation.
+	msg := &wrp.Message{
+		Type:        wrp.SimpleEventMessageType,
+		Source:      "mac:FAKEMAC",
+		Destination: "event:device-status/mac:d89c8e3a28e8/offline",
+		Payload:     []byte(`{"test":"data"}`),
+	}
+	var buf bytes.Buffer
+	enc := wrp.NewEncoder(&buf, wrp.Msgpack)
+	_ = enc.Encode(msg, wrp.NoStandardValidation())
 	b := buf.Bytes()
 	suite.buckets.On("IsInTargetBucket", mock.Anything).Return(true, nil).Once()
 	suite.producer.On("Produce", mock.Anything, mock.Anything).Return(wrpkafka.Attempted, nil).Once()
